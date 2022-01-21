@@ -1,13 +1,13 @@
-# use-defer
+# use-request
 
 > Simplify work with async functions with memoization and state
 
-[![NPM](https://img.shields.io/npm/v/use-defer.svg)](https://www.npmjs.com/package/use-defer) [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
+[![NPM](https://img.shields.io/npm/v/use-request.svg)](https://www.npmjs.com/package/use-request) [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
 
 ## Install
 
 ```bash
-npm install --save use-defer
+npm install --save use-request
 ```
 
 ## Usage
@@ -15,8 +15,8 @@ npm install --save use-defer
 ```tsx
 import * as React from 'react'
 
-import useDefer, { Status } from 'use-defer'
-// Or: import { useDefer, Status } from 'use-defer'
+import useRequest, { Status } from 'use-request'
+// Or: import { useRequest, Status } from 'use-request'
 
 const Example = () => {
   const {
@@ -24,7 +24,7 @@ const Example = () => {
     status,  // One of: Status.IDLE - no request, Status.PENDING - waiting for results, Status.SUCCESS & Status.ERROR
     value,   // Result of the last request
     error,   // Error thrown during the execution of the last request
-  } = useDefer(
+  } = useRequest(
     asyncFunction, // The function that returns a [Promise] instance
     [],            // Optional list of [React.DependencyList] type to update [asyncFunction]
     [],            // Optional arguments list. The [asyncFunction] will be called immediately if this is set
@@ -38,7 +38,7 @@ const Example = () => {
 
 ### Using it for a single async function
 
-[Source code](https://github.com/termosa/use-defer/blob/master/example/src/SingleFunctionExample.js)
+[Source code](https://github.com/termosa/use-request/blob/master/example/src/SingleFunctionExample.js)
 
 ```tsx
 const generateNumber = max => new Promise((resolve, reject) => {
@@ -51,7 +51,7 @@ const defaultMax = 100;
 const SingleFunctionExample = () => {
   const [max, setMax] = React.useState('');
 
-  const { value, error, status } = useDefer(
+  const { value, error, status } = useRequest(
     generateNumber,           // Async function that returns promise
     [max],                    // Dependencies
     [max ? +max : defaultMax] // Initial arguments
@@ -75,15 +75,15 @@ const SingleFunctionExample = () => {
 };
 ```
 
-### Create a model hook with auto reloading
+### Create a model hook with auto-reloading
 
-[Source code](https://github.com/termosa/use-defer/blob/master/example/src/MultipleFunctionsExample.js)
+[Source code](https://github.com/termosa/use-request/blob/master/example/src/MultipleFunctionsExample.js)
 
 ```tsx
 const useResources = () => {
-  const { execute: reload, value: resources, status } = useDefer(api.get, [], []);
-  const { execute: create } = useDefer(resource => api.post(resource).then(reload));
-  const { execute: remove } = useDefer(id => api.delete(id).then(reload));
+  const { execute: reload, value: resources, status } = useRequest(api.get, [], []);
+  const { execute: create } = useRequest(resource => api.post(resource).then(reload));
+  const { execute: remove } = useRequest(id => api.delete(id).then(reload));
 
   return { resources, status, create, remove };
 };

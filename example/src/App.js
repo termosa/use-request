@@ -1,7 +1,7 @@
 import React from 'react'
 import SingleFunctionExample, { code as singleFunctionExampleCode } from './SingleFunctionExample';
 import MultipleFunctionsExample, { code as multipleFunctionsExampleCode } from './MultipleFunctionsExample';
-import { version } from 'use-defer/package.json';
+import { version } from 'use-request/package.json';
 
 /** @type {React.CSSProperties} */
 const exampleStyles = {
@@ -37,7 +37,7 @@ const linkStyles = {
   color: '#444',
 };
 
-const githubExampleDirLink = 'https://github.com/termosa/use-defer/blob/master/example';
+const githubExampleDirLink = 'https://github.com/termosa/use-request/blob/master/example';
 
 const Example = ({ title, code, path, children }) => (
   <div style={exampleStyles}>
@@ -51,7 +51,7 @@ const Example = ({ title, code, path, children }) => (
 
 const App = () => (
   <React.Fragment>
-    <h1 style={titleStyles}>use-defer@{version}</h1>
+    <h1 style={titleStyles}>use-request@{version}</h1>
     <Example title="Single Request" code={singleFunctionExampleCode} path="/src/SingleFunctionExample.js">
       <SingleFunctionExample />
     </Example>

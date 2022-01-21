@@ -1,5 +1,5 @@
 import * as React from 'react';
-import useDefer, { Status } from './'
+import useRequest, { Status } from './'
 import { renderHook, act } from "@testing-library/react-hooks";
 
 // mock timer using jest
@@ -13,12 +13,12 @@ const asyncDivision = (a: number, b: number) => new Promise<number>((resolve, re
   else setTimeout(reject, oneTime, 'Cannot divide by zero');
 });
 
-describe('useDefer', () => {
+describe('useRequest', () => {
   const waitFor = (ms: number) => act(() => { jest.advanceTimersByTime(ms) });
   const waitToComplete = async (request: Promise<any>) => await act(async () => { try { await request } catch {} });
 
   it('goes through all steps', async () => {
-    const { result } = renderHook(() => useDefer(asyncDivision));
+    const { result } = renderHook(() => useRequest(asyncDivision));
 
     const executeWith = (a: number, b: number) => new Promise((resolve, reject) => {
       act(() => { result.current.execute(a, b).then(resolve, reject) });
@@ -107,7 +107,7 @@ describe('useDefer', () => {
   });
 
   it('works without promise', async () => {
-    const { result } = renderHook(() => useDefer(() => 42, [], []));
+    const { result } = renderHook(() => useRequest(() => 42, [], []));
 
     await act(() => Promise.resolve());
 
@@ -116,10 +116,21 @@ describe('useDefer', () => {
     expect(result.current.error).toBe(undefined);
   });
 
-  it('catches errors thrown in the defer function', async () => {
-    const { result } = renderHook(() => useDefer(() => Promise.reject('failure'), [], []));
+  it('catches errors thrown in the request function', async () => {
+    const { result } = renderHook(() => useRequest(() => { throw new Error('failure') }, []));
 
-    await act(() => Promise.resolve());
+    await act(() => result.current.execute().catch(() => {}));
+
+    expect(result.current.status).toBe(Status.ERROR);
+    expect(result.current.value).toBe(undefined);
+    expect(result.current.error).toBeInstanceOf(Error);
+    expect(result.current.error?.message).toBe('failure');
+  });
+
+  it('catches reject in the request function', async () => {
+    const { result } = renderHook(() => useRequest(() => Promise.reject('failure'), []));
+
+    await act(() => result.current.execute().catch(() => {}));
 
     expect(result.current.status).toBe(Status.ERROR);
     expect(result.current.value).toBe(undefined);
@@ -127,7 +138,7 @@ describe('useDefer', () => {
   });
 
   it('initiates request immediately', async () => {
-    const { result } = renderHook(() => useDefer(asyncDivision, [], [6, 2]));
+    const { result } = renderHook(() => useRequest(asyncDivision, [], [6, 2]));
 
     waitFor(halfTime);
 
@@ -150,7 +161,7 @@ describe('useDefer', () => {
   it('updates request function when dependencies changed', async () => {
     const { result } = renderHook(() => {
       const [{ a, b }, setNumbers] = React.useState({ a: 6, b: 2 });
-      const request = useDefer(() => asyncDivision(a, b), [a, b]);
+      const request = useRequest(() => asyncDivision(a, b), [a, b]);
       return { ...request, setNumbers };
     });
 

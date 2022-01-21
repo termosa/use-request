@@ -1,30 +1,30 @@
 // This is the upgraded version of https://usehooks.com/useAsync/
 import * as React from 'react';
 
-export const useDefer = <Value, Error = string, Args extends any[] = any[]>(
-  defer: (...args: Args) => Promise<Value> | Value,
+export const useRequest = <Value, ErrorValue = Error, Arguments extends unknown[] = unknown[]>(
+  request: (...args: Arguments) => Promise<Value> | Value,
   deps: React.DependencyList = [],
-  immediateArgs?: Args,
+  immediateArgs?: Arguments,
 ) => {
   const processesRef = React.useRef(0);
 
-  const stateRef = React.useRef<State<Value, Error>>({ status: Status.IDLE });
+  const stateRef = React.useRef<State<Value, ErrorValue>>({ status: Status.IDLE });
   const [state, setState] = React.useState(stateRef.current);
-  const update = (newState: State<Value, Error>) => {
+  const update = (newState: State<Value, ErrorValue>) => {
     stateRef.current = newState;
     setState(newState);
   };
 
   const reset = () => update({ status: Status.IDLE });
 
-  const execute = React.useCallback((...args: Args) => {
+  const execute = React.useCallback((...args: Arguments) => {
     ++processesRef.current;
     update({
       ...stateRef.current,
       status: Status.PENDING
     });
 
-    return new Promise<Value>(resolve => resolve(defer(...args))).then(
+    return new Promise<Value>(resolve => resolve(request(...args))).then(
       (response: Value) => {
         update({
           status: --processesRef.current ? stateRef.current.status : Status.SUCCESS,
@@ -32,7 +32,7 @@ export const useDefer = <Value, Error = string, Args extends any[] = any[]>(
         });
         return response;
       },
-      (error: Error) => {
+      (error: ErrorValue) => {
         if (!--processesRef.current) {
           update({
             status: Status.ERROR,
@@ -45,15 +45,13 @@ export const useDefer = <Value, Error = string, Args extends any[] = any[]>(
   }, deps);
 
   React.useEffect(() => {
-    if (immediateArgs) {
-      execute(...immediateArgs).catch(() => {/* To prevent uncaught promise error message */});
-    }
+    if (immediateArgs) execute(...immediateArgs);
   }, [execute, ...(immediateArgs || [])]);
 
   return { ...state, reset, execute };
 };
 
-export default useDefer;
+export default useRequest;
 
 export enum Status {
   IDLE = 'idle',
@@ -62,13 +60,13 @@ export enum Status {
   ERROR = 'error',
 };
 
-export interface State<Value, Error> {
+export interface State<Value, ErrorValue> {
   status: Status,
   value?: Value | undefined,
-  error?: Error | undefined,
+  error?: ErrorValue | undefined,
 };
 
-export interface Defer<Value, Error = string, Args extends any[] = any[]> extends State<Value, Error> {
+export interface Request<Value, ErrorValue = Error, Args extends unknown[] = unknown[]> extends State<Value, ErrorValue> {
   reset(): void
   execute(...args: Args): Promise<Value>
 }

@@ -1,6 +1,6 @@
 {
-  "short_name": "use-defer",
-  "name": "use-defer",
+  "short_name": "use-request",
+  "name": "use-request",
   "start_url": "./index.html",
   "display": "standalone",
   "theme_color": "#000000",

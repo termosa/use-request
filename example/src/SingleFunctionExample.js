@@ -1,5 +1,5 @@
 import React from 'react';
-import useDefer from 'use-defer';
+import useRequest from 'use-request';
 
 
 const generateNumber = max => new Promise((resolve, reject) => {
@@ -12,7 +12,7 @@ const defaultMax = 100;
 const SingleFunctionExample = () => {
   const [max, setMax] = React.useState('');
 
-  const { value, error, status } = useDefer(
+  const { value, error, status } = useRequest(
     generateNumber,           // Async function that returns promise
     [max],                    // Dependencies
     [max ? +max : defaultMax] // Initial arguments
@@ -41,7 +41,7 @@ export const code =
 `const SingleFunctionExample = () => {
   const [max, setMax] = React.useState('');
 
-  const { value, error, status } = useDefer(
+  const { value, error, status } = useRequest(
     generateNumber,           // Async function that returns promise
     [max],                    // Dependencies
     [max ? +max : defaultMax] // Initial arguments
