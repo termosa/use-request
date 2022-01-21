@@ -5,6 +5,7 @@
   "author": "termosa",
   "license": "MIT",
   "repository": "termosa/use-request",
+  "homepage": "http://gh.me.st/use-request/",
   "main": "dist/index.js",
   "module": "dist/index.es.js",
   "types": "dist/index.d.ts",

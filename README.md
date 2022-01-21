@@ -1,6 +1,6 @@
 # use-request
 
-> Simplify work with async functions with memoization and state
+> Make it easy to use async functions with state and memoization
 
 [![NPM](https://img.shields.io/npm/v/use-request.svg)](https://www.npmjs.com/package/use-request) [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
 
