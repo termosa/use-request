@@ -2,7 +2,6 @@
 /src/
 /.gitignore
 /.travis.yml
-/README.md
 /rollup.config.js
 /tsconfig.json
 /tsconfig.test.json
