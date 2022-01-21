@@ -1,6 +1,6 @@
 {
   "name": "use-request",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Make it easy to use async functions with state and memoization",
   "author": "termosa",
   "license": "MIT",
