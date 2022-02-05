@@ -1,6 +1,6 @@
 {
   "name": "use-request",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Call, observe and persist the result of your async functions with ease of `useCallback`!",
   "author": "termosa",
   "license": "MIT",
