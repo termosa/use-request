@@ -14,6 +14,7 @@ export const useRequest = <Value, ErrorValue = Error, Arguments extends unknown[
   immediateArgs?: Arguments
 ): Request<Value, ErrorValue, Arguments> => {
   const processesRef = React.useRef(0)
+  const lastCompletedProcessRef = React.useRef(0)
 
   const stateRef = React.useRef<State<Value, ErrorValue>>({ status: immediateArgs ? Status.PENDING : Status.IDLE })
   const [state, setState] = React.useState(stateRef.current)
@@ -25,7 +26,7 @@ export const useRequest = <Value, ErrorValue = Error, Arguments extends unknown[
   const reset = React.useCallback(() => update({ status: Status.IDLE }), [])
 
   const execute = React.useCallback((...args: Arguments) => {
-    ++processesRef.current
+    const processIndex = ++processesRef.current
     update({
       ...stateRef.current,
       status: Status.PENDING
@@ -33,12 +34,28 @@ export const useRequest = <Value, ErrorValue = Error, Arguments extends unknown[
 
     return new Promise<Value>(resolve => resolve(request(...args))).then(
       (response: Value) => {
-        update({ status: --processesRef.current ? stateRef.current.status : Status.SUCCESS, value: response })
+        if (processIndex > lastCompletedProcessRef.current) {
+          lastCompletedProcessRef.current = processIndex
+          update({
+            status:
+              processIndex === processesRef.current
+                ? Status.SUCCESS
+                : stateRef.current.status,
+            value: response
+          })
+        }
         return response
       },
       (error: ErrorValue) => {
-        if (!--processesRef.current) {
-          update({ status: Status.ERROR, error })
+        if (processIndex > lastCompletedProcessRef.current) {
+          lastCompletedProcessRef.current = processIndex
+          update({
+            status:
+              processIndex === processesRef.current
+                ? Status.ERROR
+                : stateRef.current.status,
+            error
+          })
         }
         return Promise.reject(error)
       }

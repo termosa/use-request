@@ -1,7 +1,5 @@
 # use-request
 
-https://github.com/slorber/react-async-hook
-
 > Finally, easy way to use async functions in React
 
 [![NPM](https://img.shields.io/npm/v/use-request.svg)](https://www.npmjs.com/package/use-request)
