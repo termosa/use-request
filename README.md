@@ -18,7 +18,7 @@ const RandomNumberGenerator = () => {
       <input
         type="button"
         value="Generate new number"
-        disabled={request.status === useRequest.PENDING_STATUS}
+        disabled={request.pending}
         onClick={request.execute}
       />
       {request.error && <p>Request failed due to: {request.error}</p>}
@@ -38,7 +38,7 @@ npm install --save use-request
 ## Usage
 
 ```tsx
-import useRequest, { Status } from 'use-request'
+import useRequest, { UseRequestStatus } from 'use-request'
 
 const Example = () => {
   const {
@@ -55,19 +55,19 @@ const Example = () => {
 
   // Request is not called yet, or was reset
   // Good indicator for initial screen
-  if (status === Status.IDLE /* or useRequest.IDLE_STATUS */) // ...
+  if (status === UseRequestStatus.IDLE) // ...
 
   // Request is processing right now
   // Can be used to show spinners, disable submit buttons, and etc.
-  if (status === Status.PENDING /* or useRequest.PENDING_STATUS */) // ...
+  if (status === UseRequestStatus.PENDING) // ...
 
   // Request has failed (promise is rejected)
   // The request.error property is filled with the value that promise is rejected with
-  if (status === Status.ERROR /* or useRequest.ERROR_STATUS */) // ...
+  if (status === UseRequestStatus.FAILED) // ...
 
   // Request has been completed
   // Finally, the function results are stored in request.value property, grab and use it at any time
-  if (status === Status.SUCCESS /* or useRequest.SUCCESS_STATUS */) // ...
+  if (status === UseRequestStatus.COMPLETED) // ...
 
   // ...
 }
@@ -125,7 +125,7 @@ const Example = ({ initialCategoryId }) => {
 }
 ```
 
-### Ensure that it always contains relative data with dependencies list and immediate call
+### Ensure that it always contains relative data with a dependencies list and immediate call
 
 ```tsx
 const Example = ({ categoryId }) => {

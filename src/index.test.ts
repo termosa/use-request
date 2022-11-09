@@ -1,5 +1,5 @@
 import * as React from 'react';
-import useRequest, { Status } from './'
+import useRequest, { UseRequestStatus } from './'
 import { renderHook, act } from "@testing-library/react-hooks";
 
 // mock timer using jest
@@ -25,7 +25,7 @@ describe('useRequest', () => {
     });
 
     // Check initial state
-    expect(result.current.status).toBe(Status.IDLE);
+    expect(result.current.status).toBe(UseRequestStatus.IDLE);
     expect(result.current.value).toBe(undefined);
     expect(result.current.error).toBe(undefined);
 
@@ -34,7 +34,7 @@ describe('useRequest', () => {
     waitFor(halfTime);
 
     // Check after total 0.5 sec
-    expect(result.current.status).toBe(Status.PENDING);
+    expect(result.current.status).toBe(UseRequestStatus.PENDING);
     expect(result.current.value).toBe(undefined);
     expect(result.current.error).toBe(undefined);
 
@@ -42,7 +42,7 @@ describe('useRequest', () => {
     await waitToComplete(normalRequest);
 
     // Check after total 1 sec
-    expect(result.current.status).toBe(Status.SUCCESS);
+    expect(result.current.status).toBe(UseRequestStatus.COMPLETED);
     expect(result.current.value).toBe(2);
     expect(result.current.error).toBe(undefined);
 
@@ -50,7 +50,7 @@ describe('useRequest', () => {
     const failureRequest = executeWith(6, 0);
 
     // Check that last results are persisted while fetching new data
-    expect(result.current.status).toBe(Status.PENDING);
+    expect(result.current.status).toBe(UseRequestStatus.PENDING);
     expect(result.current.value).toBe(2);
     expect(result.current.error).toBe(undefined);
 
@@ -58,7 +58,7 @@ describe('useRequest', () => {
     await waitToComplete(failureRequest);
 
     // Check failed request
-    expect(result.current.status).toBe(Status.ERROR);
+    expect(result.current.status).toBe(UseRequestStatus.FAILED);
     expect(result.current.value).toBe(undefined);
     expect(result.current.error).toBe('Cannot divide by zero');
 
@@ -68,7 +68,7 @@ describe('useRequest', () => {
     waitFor(halfTime);
 
     // Check error is still persisted while loading new data
-    expect(result.current.status).toBe(Status.PENDING);
+    expect(result.current.status).toBe(UseRequestStatus.PENDING);
     expect(result.current.value).toBe(undefined);
     expect(result.current.error).toBe('Cannot divide by zero');
 
@@ -80,7 +80,7 @@ describe('useRequest', () => {
     await waitToComplete(firstRequestInSequence);
 
     // Check the results of the first request while status is pending (because second request is processing)
-    expect(result.current.status).toBe(Status.PENDING);
+    expect(result.current.status).toBe(UseRequestStatus.PENDING);
     expect(result.current.value).toBe(3);
     expect(result.current.error).toBe(undefined);
 
@@ -92,7 +92,7 @@ describe('useRequest', () => {
     await waitToComplete(secondRequestInSequence);
 
     // Check the results of the first request while status is pending (because second request is processing)
-    expect(result.current.status).toBe(Status.PENDING);
+    expect(result.current.status).toBe(UseRequestStatus.PENDING);
     expect(result.current.value).toBe(4);
     expect(result.current.error).toBe(undefined);
 
@@ -101,7 +101,7 @@ describe('useRequest', () => {
     await waitToComplete(thirdRequestInSequence);
 
     // Check the results of the first request while status is pending (because second request is processing)
-    expect(result.current.status).toBe(Status.ERROR);
+    expect(result.current.status).toBe(UseRequestStatus.FAILED);
     expect(result.current.value).toBe(undefined);
     expect(result.current.error).toBe('Cannot divide by zero');
   });
@@ -111,17 +111,17 @@ describe('useRequest', () => {
 
     await act(() => Promise.resolve());
 
-    expect(result.current.status).toBe(Status.SUCCESS);
+    expect(result.current.status).toBe(UseRequestStatus.COMPLETED);
     expect(result.current.value).toBe(42);
     expect(result.current.error).toBe(undefined);
   });
 
   it('catches errors thrown in the request function', async () => {
-    const { result } = renderHook(() => useRequest(() => { throw new Error('failure') }, []));
+    const { result } = renderHook(() => useRequest<never, Error>(() => { throw new Error('failure') }, []));
 
     await act(() => result.current.execute().catch(() => {}));
 
-    expect(result.current.status).toBe(Status.ERROR);
+    expect(result.current.status).toBe(UseRequestStatus.FAILED);
     expect(result.current.value).toBe(undefined);
     expect(result.current.error).toBeInstanceOf(Error);
     expect(result.current.error?.message).toBe('failure');
@@ -132,7 +132,7 @@ describe('useRequest', () => {
 
     await act(() => result.current.execute().catch(() => {}));
 
-    expect(result.current.status).toBe(Status.ERROR);
+    expect(result.current.status).toBe(UseRequestStatus.FAILED);
     expect(result.current.value).toBe(undefined);
     expect(result.current.error).toBe('failure');
   });
@@ -143,7 +143,7 @@ describe('useRequest', () => {
     waitFor(halfTime);
 
     // Check after total 0.5 sec
-    expect(result.current.status).toBe(Status.PENDING);
+    expect(result.current.status).toBe(UseRequestStatus.PENDING);
     expect(result.current.value).toBe(undefined);
     expect(result.current.error).toBe(undefined);
 
@@ -153,7 +153,7 @@ describe('useRequest', () => {
     await act(() => Promise.resolve());
 
     // Check after total 1 sec
-    expect(result.current.status).toBe(Status.SUCCESS);
+    expect(result.current.status).toBe(UseRequestStatus.COMPLETED);
     expect(result.current.value).toBe(3);
     expect(result.current.error).toBe(undefined);
   });
@@ -167,7 +167,7 @@ describe('useRequest', () => {
 
     act(() => { result.current.execute() });
 
-    expect(result.current.status).toBe(Status.PENDING);
+    expect(result.current.status).toBe(UseRequestStatus.PENDING);
     expect(result.current.value).toBe(undefined);
     expect(result.current.error).toBe(undefined);
 
@@ -177,14 +177,14 @@ describe('useRequest', () => {
     await act(() => Promise.resolve());
 
     // Check after total 1 sec
-    expect(result.current.status).toBe(Status.SUCCESS);
+    expect(result.current.status).toBe(UseRequestStatus.COMPLETED);
     expect(result.current.value).toBe(3);
     expect(result.current.error).toBe(undefined);
 
     act(() => result.current.setNumbers({ a: 6, b: 3 }));
     act(() => { result.current.execute() });
 
-    expect(result.current.status).toBe(Status.PENDING);
+    expect(result.current.status).toBe(UseRequestStatus.PENDING);
     expect(result.current.value).toBe(3);
     expect(result.current.error).toBe(undefined);
 
@@ -194,7 +194,7 @@ describe('useRequest', () => {
     await act(() => Promise.resolve());
 
     // Check after total 1 sec
-    expect(result.current.status).toBe(Status.SUCCESS);
+    expect(result.current.status).toBe(UseRequestStatus.COMPLETED);
     expect(result.current.value).toBe(2);
     expect(result.current.error).toBe(undefined);
   });
