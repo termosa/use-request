@@ -107,7 +107,7 @@ const RemoveButton = (id) => {
 ### Observe the state
 
 ```tsx
-const Button = (label, callback) => {
+const Button = ({ label, callback }) => {
   const request = useRequest(callback)
 
   return (
