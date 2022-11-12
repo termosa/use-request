@@ -1,201 +1,592 @@
-import * as React from 'react';
-import useRequest, { UseRequestStatus } from './'
-import { renderHook, act } from "@testing-library/react-hooks";
+import useRequest, { UseRequestStatus, Request } from './'
+import { renderHook, act } from '@testing-library/react-hooks'
 
 // mock timer using jest
-jest.useFakeTimers();
+jest.useFakeTimers()
 
-const oneTime = 1e3;
-const halfTime = 500;
+const oneTime = 10
 
-const asyncDivision = (a: number, b: number) => new Promise<number>((resolve, reject) => {
-  if (b !== 0) setTimeout(resolve, oneTime, a / b);
-  else setTimeout(reject, oneTime, 'Cannot divide by zero');
-});
+const asyncDivision = (a: number, b: number) =>
+  new Promise<number>((resolve, reject) => {
+    if (b > a) reject('Divider is greater than dividend')
+    else if (b !== 0) resolve(a / b)
+    else reject('Cannot divide by zero')
+  })
 
-describe('useRequest', () => {
-  const waitFor = (ms: number) => act(() => { jest.advanceTimersByTime(ms) });
-  const waitToComplete = async (request: Promise<any>) => await act(async () => { try { await request } catch {} });
+const heavyTask = (ms: number, value: unknown) =>
+  new Promise((resolve, reject) => setTimeout(() => Promise.resolve(value).then(resolve, reject), ms))
 
-  it('goes through all steps', async () => {
-    const { result } = renderHook(() => useRequest(asyncDivision));
+const skip = (ms: number) =>
+  act(() => {
+    jest.advanceTimersByTime(ms)
+  })
 
-    const executeWith = (a: number, b: number) => new Promise((resolve, reject) => {
-      act(() => { result.current.execute(a, b).then(resolve, reject) });
-    });
+const expectStatus = (status: UseRequestStatus, request: Request<any, any, any>) => {
+  expect(request.status).toBe(status)
+  expect([request.idle, request.pending, request.completed, request.failed]).toEqual([
+    request.status === UseRequestStatus.Idle,
+    request.status === UseRequestStatus.Pending,
+    request.status === UseRequestStatus.Completed,
+    request.status === UseRequestStatus.Failed,
+  ])
+}
 
-    // Check initial state
-    expect(result.current.status).toBe(UseRequestStatus.IDLE);
-    expect(result.current.value).toBe(undefined);
-    expect(result.current.error).toBe(undefined);
+it('iterates states of success request from idle, through pending, to completed', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
 
-    const normalRequest = executeWith(6, 3);
+  expectStatus(UseRequestStatus.Idle, result.current)
+  expect(result.current.value).toBeUndefined()
+  expect(result.current.error).toBeUndefined()
 
-    waitFor(halfTime);
+  act(() => {
+    result.current.execute(6, 2)
+  })
 
-    // Check after total 0.5 sec
-    expect(result.current.status).toBe(UseRequestStatus.PENDING);
-    expect(result.current.value).toBe(undefined);
-    expect(result.current.error).toBe(undefined);
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBeUndefined()
+  expect(result.current.error).toBeUndefined()
 
-    waitFor(halfTime);
-    await waitToComplete(normalRequest);
+  await waitForNextUpdate()
 
-    // Check after total 1 sec
-    expect(result.current.status).toBe(UseRequestStatus.COMPLETED);
-    expect(result.current.value).toBe(2);
-    expect(result.current.error).toBe(undefined);
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe(3)
+  expect(result.current.error).toBeUndefined()
+})
 
-    // Call the async function that should fail
-    const failureRequest = executeWith(6, 0);
+it('iterates states of failure request from idle, through pending, to failed', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
 
-    // Check that last results are persisted while fetching new data
-    expect(result.current.status).toBe(UseRequestStatus.PENDING);
-    expect(result.current.value).toBe(2);
-    expect(result.current.error).toBe(undefined);
+  expectStatus(UseRequestStatus.Idle, result.current)
+  expect(result.current.value).toBeUndefined()
+  expect(result.current.error).toBeUndefined()
 
-    waitFor(oneTime);
-    await waitToComplete(failureRequest);
+  act(() => {
+    result.current.execute(6, 0)
+  })
 
-    // Check failed request
-    expect(result.current.status).toBe(UseRequestStatus.FAILED);
-    expect(result.current.value).toBe(undefined);
-    expect(result.current.error).toBe('Cannot divide by zero');
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBeUndefined()
+  expect(result.current.error).toBeUndefined()
 
-    // Reload data with new params
-    const firstRequestInSequence = executeWith(6, 2);
+  await waitForNextUpdate()
 
-    waitFor(halfTime);
+  expectStatus(UseRequestStatus.Failed, result.current)
+  expect(result.current.value).toBeUndefined()
+  expect(result.current.error).toBe('Cannot divide by zero')
+})
 
-    // Check error is still persisted while loading new data
-    expect(result.current.status).toBe(UseRequestStatus.PENDING);
-    expect(result.current.value).toBe(undefined);
-    expect(result.current.error).toBe('Cannot divide by zero');
+it('can execute the same request starting from the pending status', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
 
-    // Perform second request during the execution of the first one
-    const secondRequestInSequence = executeWith(8, 2);
+  act(() => {
+    result.current.execute(6, 2)
+  })
 
-    // Wait for the first request to complete
-    waitFor(halfTime);
-    await waitToComplete(firstRequestInSequence);
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBeUndefined()
+  expect(result.current.error).toBeUndefined()
 
-    // Check the results of the first request while status is pending (because second request is processing)
-    expect(result.current.status).toBe(UseRequestStatus.PENDING);
-    expect(result.current.value).toBe(3);
-    expect(result.current.error).toBe(undefined);
+  await waitForNextUpdate()
 
-    // Perform second request during the execution of the first one
-    const thirdRequestInSequence = executeWith(8, 0);
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe(3)
+  expect(result.current.error).toBeUndefined()
 
-    // Wait for the second request to complete
-    waitFor(halfTime);
-    await waitToComplete(secondRequestInSequence);
+  act(() => {
+    result.current.execute(8, 2)
+  })
 
-    // Check the results of the first request while status is pending (because second request is processing)
-    expect(result.current.status).toBe(UseRequestStatus.PENDING);
-    expect(result.current.value).toBe(4);
-    expect(result.current.error).toBe(undefined);
+  expectStatus(UseRequestStatus.Pending, result.current)
 
-    // Wait for the third request to complete
-    waitFor(halfTime);
-    await waitToComplete(thirdRequestInSequence);
+  await waitForNextUpdate()
 
-    // Check the results of the first request while status is pending (because second request is processing)
-    expect(result.current.status).toBe(UseRequestStatus.FAILED);
-    expect(result.current.value).toBe(undefined);
-    expect(result.current.error).toBe('Cannot divide by zero');
-  });
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe(4)
+  expect(result.current.error).toBeUndefined()
+})
 
-  it('works without promise', async () => {
-    const { result } = renderHook(() => useRequest(() => 42, [], []));
+it('keeps data from previous request when executing the same request', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
 
-    await act(() => Promise.resolve());
+  act(() => {
+    result.current.execute(6, 2)
+  })
 
-    expect(result.current.status).toBe(UseRequestStatus.COMPLETED);
-    expect(result.current.value).toBe(42);
-    expect(result.current.error).toBe(undefined);
-  });
+  await waitForNextUpdate()
 
-  it('catches errors thrown in the request function', async () => {
-    const { result } = renderHook(() => useRequest<never, Error>(() => { throw new Error('failure') }, []));
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe(3)
+  expect(result.current.error).toBeUndefined()
 
-    await act(() => result.current.execute().catch(() => {}));
+  act(() => {
+    result.current.execute(8, 2)
+  })
 
-    expect(result.current.status).toBe(UseRequestStatus.FAILED);
-    expect(result.current.value).toBe(undefined);
-    expect(result.current.error).toBeInstanceOf(Error);
-    expect(result.current.error?.message).toBe('failure');
-  });
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBe(3)
+  expect(result.current.error).toBeUndefined()
 
-  it('catches reject in the request function', async () => {
-    const { result } = renderHook(() => useRequest(() => Promise.reject('failure'), []));
+  await waitForNextUpdate() // complete execution
+})
 
-    await act(() => result.current.execute().catch(() => {}));
+it('keeps error from previous request when executing the same request', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
 
-    expect(result.current.status).toBe(UseRequestStatus.FAILED);
-    expect(result.current.value).toBe(undefined);
-    expect(result.current.error).toBe('failure');
-  });
+  act(() => {
+    result.current.execute(6, 0)
+  })
 
-  it('initiates request immediately', async () => {
-    const { result } = renderHook(() => useRequest(asyncDivision, [], [6, 2]));
+  await waitForNextUpdate()
 
-    waitFor(halfTime);
+  expectStatus(UseRequestStatus.Failed, result.current)
+  expect(result.current.value).toBeUndefined()
+  expect(result.current.error).toBe('Cannot divide by zero')
 
-    // Check after total 0.5 sec
-    expect(result.current.status).toBe(UseRequestStatus.PENDING);
-    expect(result.current.value).toBe(undefined);
-    expect(result.current.error).toBe(undefined);
+  act(() => {
+    result.current.execute(8, 2)
+  })
 
-    waitFor(halfTime);
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.error).toBe('Cannot divide by zero')
 
-    // Let the callback promise to resolve (await runs a new cycle in the event loop)
-    await act(() => Promise.resolve());
+  await waitForNextUpdate() // complete execution
+})
 
-    // Check after total 1 sec
-    expect(result.current.status).toBe(UseRequestStatus.COMPLETED);
-    expect(result.current.value).toBe(3);
-    expect(result.current.error).toBe(undefined);
-  });
+it('replaces previous result when next execution is completed', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
 
-  it('updates request function when dependencies changed', async () => {
-    const { result } = renderHook(() => {
-      const [{ a, b }, setNumbers] = React.useState({ a: 6, b: 2 });
-      const request = useRequest(() => asyncDivision(a, b), [a, b]);
-      return { ...request, setNumbers };
-    });
+  act(() => {
+    result.current.execute(6, 2)
+  })
 
-    act(() => { result.current.execute() });
+  await waitForNextUpdate()
 
-    expect(result.current.status).toBe(UseRequestStatus.PENDING);
-    expect(result.current.value).toBe(undefined);
-    expect(result.current.error).toBe(undefined);
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe(3)
+  expect(result.current.error).toBeUndefined()
 
-    waitFor(oneTime);
+  act(() => {
+    result.current.execute(8, 2)
+  })
 
-    // Let the callback promise to resolve (await runs a new cycle in the event loop)
-    await act(() => Promise.resolve());
+  await waitForNextUpdate()
 
-    // Check after total 1 sec
-    expect(result.current.status).toBe(UseRequestStatus.COMPLETED);
-    expect(result.current.value).toBe(3);
-    expect(result.current.error).toBe(undefined);
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe(4)
+})
 
-    act(() => result.current.setNumbers({ a: 6, b: 3 }));
-    act(() => { result.current.execute() });
+it('removes previous error when next execution is completed', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
 
-    expect(result.current.status).toBe(UseRequestStatus.PENDING);
-    expect(result.current.value).toBe(3);
-    expect(result.current.error).toBe(undefined);
+  act(() => {
+    result.current.execute(6, 0)
+  })
 
-    waitFor(oneTime);
+  await waitForNextUpdate()
 
-    // Let the callback promise to resolve (await runs a new cycle in the event loop)
-    await act(() => Promise.resolve());
+  expectStatus(UseRequestStatus.Failed, result.current)
+  expect(result.current.value).toBeUndefined()
+  expect(result.current.error).toBe('Cannot divide by zero')
 
-    // Check after total 1 sec
-    expect(result.current.status).toBe(UseRequestStatus.COMPLETED);
-    expect(result.current.value).toBe(2);
-    expect(result.current.error).toBe(undefined);
-  });
-});
+  act(() => {
+    result.current.execute(8, 2)
+  })
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.error).toBeUndefined()
+})
+
+it('replaces previous error when next execution is failed', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
+
+  act(() => {
+    result.current.execute(6, 0)
+  })
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Failed, result.current)
+  expect(result.current.error).toBe('Cannot divide by zero')
+
+  act(() => {
+    result.current.execute(2, 4)
+  })
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Failed, result.current)
+  expect(result.current.error).toBe('Divider is greater than dividend')
+})
+
+it('removes previous result when next execution is failed', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
+
+  act(() => {
+    result.current.execute(6, 2)
+  })
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe(3)
+  expect(result.current.error).toBeUndefined()
+
+  act(() => {
+    result.current.execute(2, 4)
+  })
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Failed, result.current)
+  expect(result.current.value).toBeUndefined()
+})
+
+it('preserves correct order of results when executing the same request multiple times', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(heavyTask))
+
+  act(() => {
+    result.current.execute(oneTime, 'first')
+  })
+
+  act(() => {
+    result.current.execute(3 * oneTime, 'second')
+    result.current.execute(2 * oneTime, 'third')
+  })
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBeUndefined()
+
+  skip(oneTime)
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBe('first')
+
+  skip(oneTime)
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe('third')
+
+  skip(oneTime)
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe('third')
+})
+
+it('preserves correct order of results when earlier request is failed before later request is completed', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(heavyTask))
+
+  act(() => {
+    result.current.execute(2 * oneTime, 'first')
+    result.current.execute(1 * oneTime, Promise.reject('second'))
+  })
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBeUndefined()
+  expect(result.current.error).toBeUndefined()
+
+  skip(oneTime)
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Failed, result.current)
+  expect(result.current.value).toBeUndefined()
+  expect(result.current.error).toBe('second')
+
+  skip(oneTime)
+
+  expectStatus(UseRequestStatus.Failed, result.current)
+  expect(result.current.value).toBeUndefined()
+  expect(result.current.error).toBe('second')
+})
+
+it('executes request immediately with given arguments', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision, [6, 2]))
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBeUndefined()
+  expect(result.current.error).toBeUndefined()
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe(3)
+  expect(result.current.error).toBeUndefined()
+})
+
+it('executes immediately with no parameters if given arguments is an empty list', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 42, []))
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+
+  await waitForNextUpdate() // complete execution
+})
+
+it('executes request again when hooks arguments variable is changed', async () => {
+  const { result, waitForNextUpdate, rerender } = renderHook(
+    ({ dividend, divider }) => useRequest(asyncDivision, [dividend, divider]),
+    { initialProps: { dividend: 6, divider: 2 } }
+  )
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+
+  rerender({ dividend: 8, divider: 2 })
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBe(3)
+  expect(result.current.error).toBeUndefined()
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe(4)
+  expect(result.current.error).toBeUndefined()
+})
+
+it('preserves correct order of results when hooks arguments variable is changed', async () => {
+  const { result, waitForNextUpdate, rerender } = renderHook(
+    ({ time, result }) => useRequest(heavyTask, [time, result]),
+    { initialProps: { time: 2 * oneTime, result: 'first' } }
+  )
+
+  rerender({ time: oneTime, result: 'second' })
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBeUndefined()
+
+  skip(oneTime)
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe('second')
+
+  skip(oneTime)
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe('second')
+})
+
+it('uses the same queue for requests triggered by hooks arguments list and by execute method', async () => {
+  const { result, rerender, waitForNextUpdate } = renderHook(
+    ({ time, result }) => useRequest(heavyTask, [time, result]),
+    {
+      initialProps: { time: oneTime, result: 'first' },
+    }
+  )
+
+  act(() => {
+    result.current.execute(4 * oneTime, 'second')
+  })
+
+  rerender({ time: 2 * oneTime, result: 'third' })
+
+  act(() => {
+    result.current.execute(3 * oneTime, 'fourth')
+  })
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBeUndefined()
+
+  skip(oneTime)
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBe('first')
+
+  skip(oneTime)
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBe('third')
+
+  skip(oneTime)
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe('fourth')
+})
+
+it('resolves any resulted from the given callback as a promise', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 123, []))
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBeUndefined()
+  expect(result.current.error).toBeUndefined()
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe(123)
+  expect(result.current.error).toBeUndefined()
+})
+
+it('rejects with an error that was thrown directly in the callback', async () => {
+  const { result, waitForNextUpdate } = renderHook(() =>
+    useRequest(() => {
+      throw 'error'
+    }, [])
+  )
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBeUndefined()
+  expect(result.current.error).toBeUndefined()
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Failed, result.current)
+  expect(result.current.value).toBeUndefined
+  expect(result.current.error).toBe('error')
+})
+
+it('returns promise from the execute function that contains the result of callback passed to the hook', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 123))
+
+  let promise
+  act(() => {
+    promise = result.current.execute()
+  })
+
+  await waitForNextUpdate()
+  expect(promise).toBeInstanceOf(Promise)
+  await expect(promise).resolves.toBe(123)
+})
+
+it('returns promise from the execute function that contains the promised result of callback passed to the hook', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(() => Promise.resolve(123)))
+
+  let promise
+  act(() => {
+    promise = result.current.execute()
+  })
+
+  await waitForNextUpdate()
+  expect(promise).toBeInstanceOf(Promise)
+  await expect(promise).resolves.toBe(123)
+})
+
+it('returns promise from the execute function that contains the error of callback passed to the hook', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(() => Promise.reject('error')))
+
+  let promise
+  act(() => {
+    promise = result.current.execute()
+  })
+
+  await waitForNextUpdate()
+  expect(promise).toBeInstanceOf(Promise)
+  await expect(promise).rejects.toBe('error')
+})
+
+it('resets completed state', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 123, []))
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe(123)
+
+  act(() => {
+    result.current.reset()
+  })
+
+  expectStatus(UseRequestStatus.Idle, result.current)
+  expect(result.current.value).toBeUndefined()
+})
+
+it('resets failed state', async () => {
+  const { result, waitForNextUpdate } = renderHook(() => useRequest(() => Promise.reject('error'), []))
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Failed, result.current)
+  expect(result.current.error).toBe('error')
+
+  act(() => {
+    result.current.reset()
+  })
+
+  expectStatus(UseRequestStatus.Idle, result.current)
+  expect(result.current.error).toBeUndefined()
+})
+
+it('cancel all requests in queue when state is reset', async () => {
+  const { result, rerender, waitForNextUpdate } = renderHook(
+    ({ time, result }) => useRequest(heavyTask, [time, result]),
+    {
+      initialProps: { time: oneTime, result: 'first' },
+    }
+  )
+
+  act(() => {
+    result.current.execute(4 * oneTime, 'second')
+  })
+
+  rerender({ time: 2 * oneTime, result: 'third' })
+
+  act(() => {
+    result.current.execute(3 * oneTime, 'fourth')
+  })
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBeUndefined()
+
+  skip(oneTime)
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBe('first')
+
+  act(() => {
+    result.current.reset()
+  })
+
+  expectStatus(UseRequestStatus.Idle, result.current)
+  expect(result.current.value).toBeUndefined()
+
+  skip(oneTime)
+
+  expectStatus(UseRequestStatus.Idle, result.current)
+  expect(result.current.value).toBeUndefined()
+
+  await waitForNextUpdate()
+})
+
+it('is not triggered when callback function is updated', async () => {
+  const { result, rerender, waitForNextUpdate } = renderHook(({ callback }) => useRequest(callback, []), {
+    initialProps: { callback: () => 123 },
+  })
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBeUndefined()
+
+  rerender({ callback: () => 456 })
+
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBeUndefined()
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe(123)
+})
+
+it('executes the last given callback', async () => {
+  const { result, rerender, waitForNextUpdate } = renderHook(({ callback }) => useRequest(callback), {
+    initialProps: { callback: () => 123 },
+  })
+
+  rerender({ callback: () => 456 })
+
+  act(() => {
+    result.current.execute()
+  })
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe(456)
+})

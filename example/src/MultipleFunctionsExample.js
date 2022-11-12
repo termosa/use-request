@@ -1,15 +1,17 @@
-import React, { useRef } from 'react';
-import useResources from './useResources';
+import React, { useRef } from 'react'
+import useResources, { UseRequestStatus } from './useResources'
 
 const MultipleFunctionsExample = () => {
-  const resourceLabelRef = useRef(null);
-  const { resources, status, create, remove } = useResources();
+  /** @type {React.MutableRefObject<null | HTMLInputElement>} */
+  const resourceLabelRef = useRef(null)
+  const { resources, status, create, remove } = useResources()
 
-  const onSubmit = e => {
-    e.preventDefault();
-    create({ label: resourceLabelRef.current.value });
-    resourceLabelRef.current.value = '';
-  };
+  const onSubmit = (e) => {
+    e.preventDefault()
+    if (!resourceLabelRef.current) return
+    create({ label: resourceLabelRef.current.value })
+    resourceLabelRef.current.value = ''
+  }
 
   return (
     <div>
@@ -18,29 +20,25 @@ const MultipleFunctionsExample = () => {
         <input type="submit" value="Add" />
       </form>
 
-      {!resources && status === 'pending' ? <p>Loading...</p> : null}
+      {!resources && status === UseRequestStatus.Pending ? <p>Loading...</p> : null}
 
-      {resources
-        ? <ol>
-          {resources.map(res => (
+      {resources ? (
+        <ol>
+          {resources.map((res) => (
             <li key={res.id}>
-              {res.label}
-              {' '}
-              <input type="button" onClick={() => remove(res.id)} value="remove" />
+              {res.label} <input type="button" onClick={() => remove(res.id)} value="remove" />
             </li>
           ))}
         </ol>
-        : null
-      }
+      ) : null}
     </div>
-  );
-};
+  )
+}
 
-export default MultipleFunctionsExample;
+export default MultipleFunctionsExample
 
-export const code =
-`const useResources = () => {
-  const { execute: reload, value: resources, status } = useRequest(api.get, [], []);
+export const code = `const useResources = () => {
+  const { execute: reload, value: resources, status } = useRequest(api.get, []);
   const { execute: create } = useRequest(resource => api.post(resource).then(reload));
   const { execute: remove } = useRequest(id => api.delete(id).then(reload));
 
@@ -53,6 +51,7 @@ const MultipleFunctionsExample = () => {
 
   const onSubmit = e => {
     e.preventDefault();
+    if (!resourceLabelRef.current) return
     create({ label: resourceLabelRef.current.value });
     resourceLabelRef.current.value = '';
   };
@@ -64,7 +63,7 @@ const MultipleFunctionsExample = () => {
         <input type="submit" value="Add" />
       </form>
 
-      {!resources && status === 'pending' ? <p>Loading...</p> : null}
+      {!resources && status === UseRequestStatus.Pending ? <p>Loading...</p> : null}
 
       {resources
         ? <ol>
@@ -80,4 +79,4 @@ const MultipleFunctionsExample = () => {
       }
     </div>
   );
-};`;
+};`

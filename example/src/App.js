@@ -1,7 +1,7 @@
 import React from 'react'
-import SingleFunctionExample, { code as singleFunctionExampleCode } from './SingleFunctionExample';
-import MultipleFunctionsExample, { code as multipleFunctionsExampleCode } from './MultipleFunctionsExample';
-import { version } from 'use-request/package.json';
+import SingleFunctionExample, { code as singleFunctionExampleCode } from './SingleFunctionExample'
+import MultipleFunctionsExample, { code as multipleFunctionsExampleCode } from './MultipleFunctionsExample'
+import { version } from 'use-request/package.json'
 
 /** @type {React.CSSProperties} */
 const exampleStyles = {
@@ -10,18 +10,18 @@ const exampleStyles = {
   padding: '2em',
   margin: '2em',
   border: '2px solid lightgray',
-};
+}
 
 /** @type {React.CSSProperties} */
 const titleStyles = {
   width: '100%',
   textAlign: 'center',
-};
+}
 
 /** @type {React.CSSProperties} */
 const codeStyles = {
   flex: 1,
-};
+}
 
 /** @type {React.CSSProperties} */
 const previewStyles = {
@@ -30,24 +30,26 @@ const previewStyles = {
   paddingLeft: '2em',
   borderLeft: '1px solid lightgray',
   width: '260px',
-};
+}
 
 /** @type {React.CSSProperties} */
 const linkStyles = {
   color: '#444',
-};
+}
 
-const githubExampleDirLink = 'https://github.com/termosa/use-request/blob/master/example';
+const githubExampleDirLink = 'https://github.com/termosa/use-request/blob/master/example'
 
 const Example = ({ title, code, path, children }) => (
   <div style={exampleStyles}>
     <h2 style={titleStyles}>
-      <a href={`${githubExampleDirLink}${path}`} style={linkStyles}>Example: {title}</a>
+      <a href={`${githubExampleDirLink}${path}`} style={linkStyles}>
+        Example: {title}
+      </a>
     </h2>
     <pre style={codeStyles}>{code}</pre>
     <div style={previewStyles}>{children}</div>
   </div>
-);
+)
 
 const App = () => (
   <React.Fragment>
@@ -59,6 +61,6 @@ const App = () => (
       <MultipleFunctionsExample />
     </Example>
   </React.Fragment>
-);
+)
 
-export default App;
+export default App

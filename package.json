@@ -2,7 +2,13 @@
   "name": "use-request",
   "version": "0.0.4",
   "description": "Call, observe and persist the result of your async functions with ease of `useCallback`!",
-  "keywords": ["async", "promise", "hook", "react", "api"],
+  "keywords": [
+    "async",
+    "promise",
+    "hook",
+    "react",
+    "api"
+  ],
   "author": "termosa",
   "license": "MIT",
   "repository": "termosa/use-request",

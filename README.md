@@ -1,10 +1,10 @@
-# use-request
+# `useRequest(cb, [...args])`
 
 > Finally, easy way to use async functions in React
 
 [![NPM](https://img.shields.io/npm/v/use-request.svg)](https://www.npmjs.com/package/use-request)
 
-Call, observe, and persist the result of your async functions with ease of `useCallback()`!
+Call, observe, and persist the result of your async functions with the ease!
 
 See how it works:
 
@@ -15,12 +15,7 @@ const RandomNumberGenerator = () => {
   return (
     <div>
       {request.value && <p>Here is your random number: {request.value}</p>}
-      <input
-        type="button"
-        value="Generate new number"
-        disabled={request.pending}
-        onClick={request.execute}
-      />
+      <input type="button" value="Generate new number" disabled={request.pending} onClick={request.execute} />
       {request.error && <p>Request failed due to: {request.error}</p>}
     </div>
   )
@@ -41,33 +36,29 @@ npm install --save use-request
 import useRequest, { UseRequestStatus } from 'use-request'
 
 const Example = () => {
-  const {
-    execute, // Callback for the [asyncFunction] with the same arguments list and result
-    status,  // Instance of Sta tus to observe the lifecycle of the asyncFunction
-    value,   // Result of the last request
-    error,   // Error thrown during the execution of the last request
-    reset,   // Drop the state
-  } = useRequest(
-    asyncFunction, // The function that returns a [Promise] instance
-    [],            // Optional list of [React.DependencyList] type to update [asyncFunction]
-    [],            // Optional arguments list. The [asyncFunction] will be called immediately if this is set
+  const request = useRequest(
+    callback, // Async function (can be sync if needed)
+    [] // Optional arguments list. The callback will be called immediately if this is set
   )
 
-  // Request is not called yet, or was reset
-  // Good indicator for initial screen
-  if (status === UseRequestStatus.IDLE) // ...
+  // Results
 
-  // Request is processing right now
-  // Can be used to show spinners, disable submit buttons, and etc.
-  if (status === UseRequestStatus.PENDING) // ...
+  request.value // Last result of the callback
+  request.error // Last error thrown from the callback
 
-  // Request has failed (promise is rejected)
-  // The request.error property is filled with the value that promise is rejected with
-  if (status === UseRequestStatus.FAILED) // ...
+  // Methods
 
-  // Request has been completed
-  // Finally, the function results are stored in request.value property, grab and use it at any time
-  if (status === UseRequestStatus.COMPLETED) // ...
+  request.execute(...callbackArgs) // Proxy to trigger the callback()
+  request.reset() // Drop the state and cancel ongoing requests
+
+  // Lifecycle
+
+  request.idle // True, when request is not initialized or was reset, use for initial screen
+  request.pending // True, when the request is ongoing, use to show spinners, disabled forms, etc.
+  request.completed // True, when the request is successfully resolved
+  request.failed // True, when the request is rejected
+
+  request.status // Value of UseRequestStatus enum, helpful for tracking request status
 
   // ...
 }
@@ -76,60 +67,54 @@ const Example = () => {
 ### The simplest usage sample
 
 ```tsx
-const Example = () => {
-  const request = useRequest(() => api('/random-number'))
+function SaveButton() {
+  const request = useRequest(() => api('/save'))
 
-  request.execute()
+  return <button onClick={request.execute}>save</button>
 }
 ```
 
-### You can pass arguments to it
+### Make it run instantly
 
 ```tsx
-const Example = () => {
-  const request = useRequest((max = 100) => api(`/random-number?max=${max}`))
+function useUserData() {
+  const request = useRequest(() => api('/user'), [])
 
-  request.execute(80)
+  return request.value
 }
 ```
 
-### Depend it on other values
+### Configure it
 
 ```tsx
-const Example = ({ categoryId }) => {
-  const request = useRequest(() => api(`/posts?category_id=${categoryId}`), [categoryId])
+function useUserData(userId) {
+  const request = useRequest((id) => api(`/user/${id}`), [userId])
 
-  request.execute()
+  return request.value
 }
 ```
 
-### Initiate the request when rendering component
+### Use arguments with `execute()`
 
 ```tsx
-const Example = () => {
-  const request = useRequest(() => api('/posts'), [], [])
+const RemoveButton = (id) => {
+  const request = useRequest((itemId) => api.delete(`/items/${itemId}`))
+
+  return <button onClick={() => request.execute(id)}>remove</button>
 }
 ```
 
-### Initiate the request with initial parameters
+### Observe the state
 
 ```tsx
-const Example = ({ initialCategoryId }) => {
-  const request = useRequest((cid) => api(`/posts?category_id=${cid}`), [], [defaultCategoryId])
+const Button = (label, callback) => {
+  const request = useRequest(callback)
 
   return (
-    // ...
-    <CategoriesList onSelect={(cid) => request.execute(cid)} />
-    // ...
+    <button onClick={request.execute} disabled={request.pending}>
+      {label}
+    </button>
   )
-}
-```
-
-### Ensure that it always contains relative data with a dependencies list and immediate call
-
-```tsx
-const Example = ({ categoryId }) => {
-  const request = useRequest(() => api(`/posts?category_id=${categoryId}`), [categoryId], [])
 }
 ```
 
@@ -140,38 +125,33 @@ const Example = ({ categoryId }) => {
 [Source code](https://github.com/termosa/use-request/blob/master/example/src/SingleFunctionExample.js)
 
 ```tsx
-const generateNumber = max => new Promise((resolve, reject) => {
-  if (max > 0) setTimeout(resolve, 2e3, Math.round(Math.random() * max));
-  else setTimeout(reject, 2e3, 'Max value must be greater than zero');
-});
+const generateNumber = (max) =>
+  new Promise((resolve, reject) => {
+    if (max > 0) setTimeout(resolve, 2e3, Math.round(Math.random() * max))
+    else setTimeout(reject, 2e3, 'Max value must be greater than zero')
+  })
 
-const defaultMax = 100;
+const defaultMax = 100
 
 const SingleFunctionExample = () => {
-  const [max, setMax] = React.useState('');
+  const [max, setMax] = React.useState('')
 
-  const { value, error, status } = useRequest(
-    generateNumber,           // Async function that returns promise
-    [max],                    // Dependencies
+  const { value, error, pending } = useRequest(
+    generateNumber, // Async function that returns promise
     [max ? +max : defaultMax] // Initial arguments
-  );
+  )
 
   return (
     <div>
       <div>
-        <input
-          type="number"
-          value={max}
-          placeholder={defaultMax.toString()}
-          onChange={e => setMax(e.target.value)}
-        />
-        {status === 'pending' ? <span>processing </span> : null}
+        <input type="number" value={max} placeholder={defaultMax.toString()} onChange={(e) => setMax(e.target.value)} />
+        {pending ? <span> processing</span> : null}
       </div>
       {value !== undefined ? <div>Last result: {value}</div> : null}
       {error ? <div>Error: {error}</div> : null}
     </div>
-  );
-};
+  )
+}
 ```
 
 ### Create a model hook with auto-reloading
@@ -180,19 +160,21 @@ const SingleFunctionExample = () => {
 
 ```tsx
 const useResources = () => {
-  const { execute: reload, value: resources, status } = useRequest(api.get, [], [])
-  const { execute: create } = useRequest(resource => api.post(resource).then(reload))
-  const { execute: remove } = useRequest(id => api.delete(id).then(reload))
+  const { execute: reload, value: resources, status } = useRequest(api.get, [])
+  const { execute: create } = useRequest((resource) => api.post(resource).then(reload))
+  const { execute: remove } = useRequest((id) => api.delete(id).then(reload))
 
   return { resources, status, create, remove }
 }
 
 const MultipleFunctionsExample = () => {
+  /** @type {React.MutableRefObject<null | HTMLInputElement>} */
   const resourceLabelRef = useRef(null)
   const { resources, status, create, remove } = useResources()
 
-  const onSubmit = e => {
+  const onSubmit = (e) => {
     e.preventDefault()
+    if (!resourceLabelRef.current) return
     create({ label: resourceLabelRef.current.value })
     resourceLabelRef.current.value = ''
   }
@@ -204,20 +186,17 @@ const MultipleFunctionsExample = () => {
         <input type="submit" value="Add" />
       </form>
 
-      {!resources && status === 'pending' ? <p>Loading...</p> : null}
+      {!resources && status === UseRequestStatus.Pending ? <p>Loading...</p> : null}
 
-      {resources
-        ? <ol>
-          {resources.map(res => (
+      {resources ? (
+        <ol>
+          {resources.map((res) => (
             <li key={res.id}>
-              {res.label}
-              {' '}
-              <input type="button" onClick={() => remove(res.id)} value="remove" />
+              {res.label} <input type="button" onClick={() => remove(res.id)} value="remove" />
             </li>
           ))}
         </ol>
-        : null
-      }
+      ) : null}
     </div>
   )
 }
@@ -225,7 +204,7 @@ const MultipleFunctionsExample = () => {
 
 ## License
 
-MIT © [termosa](https://github.com/termosa)
+MIT © [termosa](https://me.st)
 
 ---
 

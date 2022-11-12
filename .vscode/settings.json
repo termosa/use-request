@@ -1,7 +1,4 @@
 {
-    "cSpell.words": [
-        "jsnext",
-        "Pokemons",
-        "predeploy"
-    ]
+  "editor.formatOnSave": true,
+  "cSpell.words": ["jsnext", "Pokemons", "predeploy"]
 }
