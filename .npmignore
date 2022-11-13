@@ -1,6 +1,9 @@
+/.vscode/
 /examples/
 /src/
+/dist/index.test.d.ts
 /.gitignore
+/.prettierrc.json
 /.travis.yml
 /rollup.config.js
 /tsconfig.json

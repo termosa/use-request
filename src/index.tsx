@@ -1,4 +1,3 @@
-// This is the upgraded version of https://usehooks.com/useAsync/
 import * as React from 'react'
 
 export enum UseRequestStatus {
@@ -8,10 +7,10 @@ export enum UseRequestStatus {
   Failed = 'failed',
 }
 
-export const useRequest = <Value, ErrorValue extends unknown = unknown, Arguments extends unknown[] = unknown[]>(
+export function useRequest<Value, ErrorValue extends unknown = unknown, Arguments extends unknown[] = unknown[]>(
   request: (...args: Arguments) => Promise<Value> | Value,
   deps?: Arguments | null
-): Request<Value, ErrorValue, Arguments> => {
+): Request<Value, ErrorValue, Arguments> {
   const processesRef = React.useRef(0)
   const lastCompletedProcessRef = React.useRef(0)
 

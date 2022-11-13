@@ -15,6 +15,8 @@
   "homepage": "http://gh.me.st/use-request/",
   "main": "dist/index.js",
   "module": "dist/index.es.js",
+  "browser": "dist/index.umd.min.js",
+  "unpkg": "dist/index.umd.min.js",
   "types": "dist/index.d.ts",
   "jsnext:main": "dist/index.es.js",
   "engines": {
@@ -37,10 +39,7 @@
     "@babel/core": "^7.2.2",
     "@babel/runtime": "^7.3.1",
     "@rollup/plugin-babel": "^5.2.0",
-    "@rollup/plugin-commonjs": "^15.0.0",
-    "@rollup/plugin-node-resolve": "^9.0.0",
     "@rollup/plugin-typescript": "^5.0.2",
-    "@rollup/plugin-url": "^5.0.1",
     "@testing-library/react-hooks": "^3.2.1",
     "@types/jest": "^23.3.13",
     "@types/react": "^16.7.22",
@@ -50,7 +49,7 @@
     "react-scripts": "^3.4.0",
     "react-test-renderer": "^16.9.0",
     "rollup": "^2.26.9",
-    "rollup-plugin-peer-deps-external": "^2.2.0",
+    "rollup-plugin-terser": "^7.0.2",
     "tslib": "^2.0.1",
     "typescript": "^3.2.4"
   }
