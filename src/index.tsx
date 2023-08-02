@@ -8,7 +8,7 @@ export enum UseRequestStatus {
 }
 
 export function useRequest<Value, ErrorValue extends unknown = unknown, Arguments extends unknown[] = unknown[]>(
-  request: (...args: Arguments) => Promise<Value> | Value,
+  request: (...args: [...Arguments, ...any[]]) => Promise<Value> | Value,
   deps?: Arguments | null
 ): Request<Value, ErrorValue, Arguments> {
   const processesRef = React.useRef(0)
@@ -35,7 +35,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
       status: UseRequestStatus.Pending,
     })
 
-    const promise = new Promise<Value>((resolve) => resolve(requestRef.current(...args)))
+    const promise = new Promise<Value>((resolve) => resolve(requestRef.current(...(args as any))))
     promise.then(
       (response: Value) => {
         if (processIndex > lastCompletedProcessRef.current) {
