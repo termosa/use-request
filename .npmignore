@@ -1,5 +1,5 @@
 /.vscode/
-/examples/
+/example/
 /src/
 /dist/index.test.d.ts
 /.gitignore
