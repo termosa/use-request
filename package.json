@@ -1,6 +1,6 @@
 {
   "name": "use-request",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Call, observe and persist the result of your async functions with ease of `useCallback`!",
   "keywords": [
     "async",
