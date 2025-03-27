@@ -59,7 +59,14 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
     return promise
   }, deps || [])
 
+  const lastExecutedFunctionRef = React.useRef<typeof execute>()
+  const lastExecutedDepsRef = React.useRef<typeof deps>()
   React.useEffect(() => {
+    if (lastExecutedFunctionRef.current === execute && lastExecutedDepsRef.current === deps) return
+
+    lastExecutedFunctionRef.current = execute
+    lastExecutedDepsRef.current = deps
+
     if (deps) execute(...deps)
   }, [execute, ...(deps || [])])
 
