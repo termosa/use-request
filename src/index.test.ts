@@ -438,7 +438,7 @@ it('rejects with an error that was thrown directly in the callback', async () =>
   await waitForNextUpdate()
 
   expectStatus(UseRequestStatus.Failed, result.current)
-  expect(result.current.value).toBeUndefined
+  expect(result.current.value).toBeUndefined()
   expect(result.current.error).toBe('error')
 })
 
