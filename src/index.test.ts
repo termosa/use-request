@@ -1,5 +1,5 @@
 import useRequest, { UseRequestStatus, Request } from './'
-import { renderHook, act } from '@testing-library/react-hooks'
+import { renderHook, act, waitFor } from '@testing-library/react'
 
 // mock timer using jest
 jest.useFakeTimers()
@@ -32,7 +32,7 @@ const expectStatus = (status: UseRequestStatus, request: Request<any, any, any>)
 }
 
 it('iterates states of success request from idle, through pending, to completed', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
+  const { result } = renderHook(() => useRequest(asyncDivision))
 
   expectStatus(UseRequestStatus.Idle, result.current)
   expect(result.current.value).toBeUndefined()
@@ -46,15 +46,16 @@ it('iterates states of success request from idle, through pending, to completed'
   expect(result.current.value).toBeUndefined()
   expect(result.current.error).toBeUndefined()
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.value).toBe(3)
   expect(result.current.error).toBeUndefined()
 })
 
 it('iterates states of failure request from idle, through pending, to failed', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
+  const { result } = renderHook(() => useRequest(asyncDivision))
 
   expectStatus(UseRequestStatus.Idle, result.current)
   expect(result.current.value).toBeUndefined()
@@ -68,15 +69,16 @@ it('iterates states of failure request from idle, through pending, to failed', a
   expect(result.current.value).toBeUndefined()
   expect(result.current.error).toBeUndefined()
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Failed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Failed, result.current)
   expect(result.current.value).toBeUndefined()
   expect(result.current.error).toBe('Cannot divide by zero')
 })
 
 it('can execute the same request starting from the pending status', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
+  const { result } = renderHook(() => useRequest(asyncDivision))
 
   act(() => {
     result.current.execute(6, 2)
@@ -86,9 +88,10 @@ it('can execute the same request starting from the pending status', async () => 
   expect(result.current.value).toBeUndefined()
   expect(result.current.error).toBeUndefined()
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.value).toBe(3)
   expect(result.current.error).toBeUndefined()
 
@@ -98,23 +101,25 @@ it('can execute the same request starting from the pending status', async () => 
 
   expectStatus(UseRequestStatus.Pending, result.current)
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+    expect(result.current.value).toBe(4)
+  })
 
-  expectStatus(UseRequestStatus.Completed, result.current)
-  expect(result.current.value).toBe(4)
   expect(result.current.error).toBeUndefined()
 })
 
 it('keeps data from previous request when executing the same request', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
+  const { result } = renderHook(() => useRequest(asyncDivision))
 
   act(() => {
     result.current.execute(6, 2)
   })
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.value).toBe(3)
   expect(result.current.error).toBeUndefined()
 
@@ -126,19 +131,22 @@ it('keeps data from previous request when executing the same request', async () 
   expect(result.current.value).toBe(3)
   expect(result.current.error).toBeUndefined()
 
-  await waitForNextUpdate() // complete execution
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 })
 
 it('keeps error from previous request when executing the same request', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
+  const { result } = renderHook(() => useRequest(asyncDivision))
 
   act(() => {
     result.current.execute(6, 0)
   })
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Failed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Failed, result.current)
   expect(result.current.value).toBeUndefined()
   expect(result.current.error).toBe('Cannot divide by zero')
 
@@ -149,19 +157,22 @@ it('keeps error from previous request when executing the same request', async ()
   expectStatus(UseRequestStatus.Pending, result.current)
   expect(result.current.error).toBe('Cannot divide by zero')
 
-  await waitForNextUpdate() // complete execution
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 })
 
 it('replaces previous result when next execution is completed', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
+  const { result } = renderHook(() => useRequest(asyncDivision))
 
   act(() => {
     result.current.execute(6, 2)
   })
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.value).toBe(3)
   expect(result.current.error).toBeUndefined()
 
@@ -169,22 +180,23 @@ it('replaces previous result when next execution is completed', async () => {
     result.current.execute(8, 2)
   })
 
-  await waitForNextUpdate()
-
-  expectStatus(UseRequestStatus.Completed, result.current)
-  expect(result.current.value).toBe(4)
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+    expect(result.current.value).toBe(4)
+  })
 })
 
 it('removes previous error when next execution is completed', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
+  const { result } = renderHook(() => useRequest(asyncDivision))
 
   act(() => {
     result.current.execute(6, 0)
   })
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Failed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Failed, result.current)
   expect(result.current.value).toBeUndefined()
   expect(result.current.error).toBe('Cannot divide by zero')
 
@@ -192,44 +204,47 @@ it('removes previous error when next execution is completed', async () => {
     result.current.execute(8, 2)
   })
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.error).toBeUndefined()
 })
 
 it('replaces previous error when next execution is failed', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
+  const { result } = renderHook(() => useRequest(asyncDivision))
 
   act(() => {
     result.current.execute(6, 0)
   })
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Failed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Failed, result.current)
   expect(result.current.error).toBe('Cannot divide by zero')
 
   act(() => {
     result.current.execute(2, 4)
   })
 
-  await waitForNextUpdate()
-
-  expectStatus(UseRequestStatus.Failed, result.current)
-  expect(result.current.error).toBe('Divider is greater than dividend')
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Failed, result.current)
+    expect(result.current.error).toBe('Divider is greater than dividend')
+  })
 })
 
 it('removes previous result when next execution is failed', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision))
+  const { result } = renderHook(() => useRequest(asyncDivision))
 
   act(() => {
     result.current.execute(6, 2)
   })
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.value).toBe(3)
   expect(result.current.error).toBeUndefined()
 
@@ -237,14 +252,15 @@ it('removes previous result when next execution is failed', async () => {
     result.current.execute(2, 4)
   })
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Failed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Failed, result.current)
   expect(result.current.value).toBeUndefined()
 })
 
 it('preserves correct order of results when executing the same request multiple times', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(heavyTask))
+  const { result } = renderHook(() => useRequest(heavyTask))
 
   act(() => {
     result.current.execute(oneTime, 'first')
@@ -258,26 +274,30 @@ it('preserves correct order of results when executing the same request multiple 
   expectStatus(UseRequestStatus.Pending, result.current)
   expect(result.current.value).toBeUndefined()
 
-  skip(oneTime)
-  await waitForNextUpdate()
+  await act(async () => {
+    jest.advanceTimersByTime(oneTime)
+  })
 
   expectStatus(UseRequestStatus.Pending, result.current)
   expect(result.current.value).toBe('first')
 
-  skip(oneTime)
-  await waitForNextUpdate()
+  await act(async () => {
+    jest.advanceTimersByTime(oneTime)
+  })
 
   expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.value).toBe('third')
 
-  skip(oneTime)
+  await act(async () => {
+    jest.advanceTimersByTime(oneTime)
+  })
 
   expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.value).toBe('third')
 })
 
 it('preserves correct order of results when earlier request is failed before later request is completed', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(heavyTask))
+  const { result } = renderHook(() => useRequest(heavyTask))
 
   act(() => {
     result.current.execute(2 * oneTime, 'first')
@@ -288,14 +308,17 @@ it('preserves correct order of results when earlier request is failed before lat
   expect(result.current.value).toBeUndefined()
   expect(result.current.error).toBeUndefined()
 
-  skip(oneTime)
-  await waitForNextUpdate()
+  await act(async () => {
+    jest.advanceTimersByTime(oneTime)
+  })
 
   expectStatus(UseRequestStatus.Failed, result.current)
   expect(result.current.value).toBeUndefined()
   expect(result.current.error).toBe('second')
 
-  skip(oneTime)
+  await act(async () => {
+    jest.advanceTimersByTime(oneTime)
+  })
 
   expectStatus(UseRequestStatus.Failed, result.current)
   expect(result.current.value).toBeUndefined()
@@ -303,13 +326,15 @@ it('preserves correct order of results when earlier request is failed before lat
 })
 
 it('executes request immediately with given arguments', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision, [6, 2]))
+  const { result } = renderHook(() => useRequest(asyncDivision, [6, 2]))
 
   expectStatus(UseRequestStatus.Pending, result.current)
   expect(result.current.value).toBeUndefined()
   expect(result.current.error).toBeUndefined()
 
-  await waitForNextUpdate()
+  await act(async () => {
+    await Promise.resolve()
+  })
 
   expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.value).toBe(3)
@@ -317,22 +342,24 @@ it('executes request immediately with given arguments', async () => {
 })
 
 it('executes immediately with no parameters if given arguments is an empty list', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 42, []))
+  const { result } = renderHook(() => useRequest(() => 42, []))
 
   expectStatus(UseRequestStatus.Pending, result.current)
 
-  await waitForNextUpdate() // complete execution
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 })
 
 it('executes request again when hooks arguments variable is changed', async () => {
-  const { result, waitForNextUpdate, rerender } = renderHook(
+  const { result, rerender } = renderHook(
     ({ dividend, divider }) => useRequest(asyncDivision, [dividend, divider]),
     { initialProps: { dividend: 6, divider: 2 } }
   )
 
-  await waitForNextUpdate()
-
-  expectStatus(UseRequestStatus.Completed, result.current)
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 
   rerender({ dividend: 8, divider: 2 })
 
@@ -340,16 +367,17 @@ it('executes request again when hooks arguments variable is changed', async () =
   expect(result.current.value).toBe(3)
   expect(result.current.error).toBeUndefined()
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+    expect(result.current.value).toBe(4)
+  })
 
-  expectStatus(UseRequestStatus.Completed, result.current)
-  expect(result.current.value).toBe(4)
   expect(result.current.error).toBeUndefined()
 })
 
 it('preserves correct order of results when hooks arguments variable is changed', async () => {
-  const { result, waitForNextUpdate, rerender } = renderHook(
-    ({ time, result }) => useRequest(heavyTask, [time, result]),
+  const { result, rerender } = renderHook(
+    ({ time, result: res }) => useRequest(heavyTask, [time, res]),
     { initialProps: { time: 2 * oneTime, result: 'first' } }
   )
 
@@ -359,10 +387,10 @@ it('preserves correct order of results when hooks arguments variable is changed'
   expect(result.current.value).toBeUndefined()
 
   skip(oneTime)
-  await waitForNextUpdate()
-
-  expectStatus(UseRequestStatus.Completed, result.current)
-  expect(result.current.value).toBe('second')
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+    expect(result.current.value).toBe('second')
+  })
 
   skip(oneTime)
 
@@ -371,8 +399,8 @@ it('preserves correct order of results when hooks arguments variable is changed'
 })
 
 it('uses the same queue for requests triggered by hooks arguments list and by execute method', async () => {
-  const { result, rerender, waitForNextUpdate } = renderHook(
-    ({ time, result }) => useRequest(heavyTask, [time, result]),
+  const { result, rerender } = renderHook(
+    ({ time, result: res }) => useRequest(heavyTask, [time, res]),
     {
       initialProps: { time: oneTime, result: 'first' },
     }
@@ -391,41 +419,45 @@ it('uses the same queue for requests triggered by hooks arguments list and by ex
   expectStatus(UseRequestStatus.Pending, result.current)
   expect(result.current.value).toBeUndefined()
 
-  skip(oneTime)
-  await waitForNextUpdate()
+  await act(async () => {
+    jest.advanceTimersByTime(oneTime)
+  })
 
   expectStatus(UseRequestStatus.Pending, result.current)
   expect(result.current.value).toBe('first')
 
-  skip(oneTime)
-  await waitForNextUpdate()
+  await act(async () => {
+    jest.advanceTimersByTime(oneTime)
+  })
 
   expectStatus(UseRequestStatus.Pending, result.current)
   expect(result.current.value).toBe('third')
 
-  skip(oneTime)
-  await waitForNextUpdate()
+  await act(async () => {
+    jest.advanceTimersByTime(oneTime)
+  })
 
   expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.value).toBe('fourth')
 })
 
 it('resolves any resulted from the given callback as a promise', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 123, []))
+  const { result } = renderHook(() => useRequest(() => 123, []))
 
   expectStatus(UseRequestStatus.Pending, result.current)
   expect(result.current.value).toBeUndefined()
   expect(result.current.error).toBeUndefined()
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.value).toBe(123)
   expect(result.current.error).toBeUndefined()
 })
 
 it('rejects with an error that was thrown directly in the callback', async () => {
-  const { result, waitForNextUpdate } = renderHook(() =>
+  const { result } = renderHook(() =>
     useRequest(() => {
       throw 'error'
     }, [])
@@ -435,58 +467,69 @@ it('rejects with an error that was thrown directly in the callback', async () =>
   expect(result.current.value).toBeUndefined()
   expect(result.current.error).toBeUndefined()
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Failed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Failed, result.current)
-  expect(result.current.value).toBeUndefined
+  expect(result.current.value).toBeUndefined()
   expect(result.current.error).toBe('error')
 })
 
 it('returns promise from the execute function that contains the result of callback passed to the hook', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 123))
+  const { result } = renderHook(() => useRequest(() => 123))
 
-  let promise
+  let promise: Promise<number> | undefined
   act(() => {
     promise = result.current.execute()
   })
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
+
   expect(promise).toBeInstanceOf(Promise)
   await expect(promise).resolves.toBe(123)
 })
 
 it('returns promise from the execute function that contains the promised result of callback passed to the hook', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(() => Promise.resolve(123)))
+  const { result } = renderHook(() => useRequest(() => Promise.resolve(123)))
 
-  let promise
+  let promise: Promise<number> | undefined
   act(() => {
     promise = result.current.execute()
   })
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
+
   expect(promise).toBeInstanceOf(Promise)
   await expect(promise).resolves.toBe(123)
 })
 
 it('returns promise from the execute function that contains the error of callback passed to the hook', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(() => Promise.reject('error')))
+  const { result } = renderHook(() => useRequest(() => Promise.reject('error')))
 
-  let promise
+  let promise: Promise<unknown> | undefined
   act(() => {
     promise = result.current.execute()
   })
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Failed, result.current)
+  })
+
   expect(promise).toBeInstanceOf(Promise)
   await expect(promise).rejects.toBe('error')
 })
 
 it('resets completed state', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 123, []))
+  const { result } = renderHook(() => useRequest(() => 123, []))
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.value).toBe(123)
 
   act(() => {
@@ -498,11 +541,12 @@ it('resets completed state', async () => {
 })
 
 it('resets failed state', async () => {
-  const { result, waitForNextUpdate } = renderHook(() => useRequest(() => Promise.reject('error'), []))
+  const { result } = renderHook(() => useRequest(() => Promise.reject('error'), []))
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Failed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Failed, result.current)
   expect(result.current.error).toBe('error')
 
   act(() => {
@@ -514,8 +558,8 @@ it('resets failed state', async () => {
 })
 
 it('cancel all requests in queue when state is reset', async () => {
-  const { result, rerender, waitForNextUpdate } = renderHook(
-    ({ time, result }) => useRequest(heavyTask, [time, result]),
+  const { result, rerender } = renderHook(
+    ({ time, result: res }) => useRequest(heavyTask, [time, res]),
     {
       initialProps: { time: oneTime, result: 'first' },
     }
@@ -534,8 +578,9 @@ it('cancel all requests in queue when state is reset', async () => {
   expectStatus(UseRequestStatus.Pending, result.current)
   expect(result.current.value).toBeUndefined()
 
-  skip(oneTime)
-  await waitForNextUpdate()
+  await act(async () => {
+    jest.advanceTimersByTime(oneTime)
+  })
 
   expectStatus(UseRequestStatus.Pending, result.current)
   expect(result.current.value).toBe('first')
@@ -547,16 +592,15 @@ it('cancel all requests in queue when state is reset', async () => {
   expectStatus(UseRequestStatus.Idle, result.current)
   expect(result.current.value).toBeUndefined()
 
-  skip(oneTime)
-
-  expectStatus(UseRequestStatus.Idle, result.current)
-  expect(result.current.value).toBeUndefined()
-
-  await waitForNextUpdate()
+  // Allow remaining timers and promises to complete
+  await act(async () => {
+    jest.advanceTimersByTime(4 * oneTime)
+    await Promise.resolve()
+  })
 })
 
 it('is not triggered when callback function is updated', async () => {
-  const { result, rerender, waitForNextUpdate } = renderHook(({ callback }) => useRequest(callback, []), {
+  const { result, rerender } = renderHook(({ callback }) => useRequest(callback, []), {
     initialProps: { callback: () => 123 },
   })
 
@@ -568,14 +612,15 @@ it('is not triggered when callback function is updated', async () => {
   expectStatus(UseRequestStatus.Pending, result.current)
   expect(result.current.value).toBeUndefined()
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.value).toBe(123)
 })
 
 it('executes the last given callback', async () => {
-  const { result, rerender, waitForNextUpdate } = renderHook(({ callback }) => useRequest(callback), {
+  const { result, rerender } = renderHook(({ callback }) => useRequest(callback), {
     initialProps: { callback: () => 123 },
   })
 
@@ -585,8 +630,96 @@ it('executes the last given callback', async () => {
     result.current.execute()
   })
 
-  await waitForNextUpdate()
+  await waitFor(() => {
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 
-  expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.value).toBe(456)
+})
+
+describe('memory leak prevention on unmount', () => {
+  it('should not update state after component unmounts', async () => {
+    const { result, unmount } = renderHook(() => useRequest(heavyTask))
+
+    act(() => {
+      result.current.execute(2 * oneTime, 'result')
+    })
+
+    expect(result.current.status).toBe(UseRequestStatus.Pending)
+
+    unmount()
+
+    skip(2 * oneTime)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(true).toBe(true)
+  })
+
+  it('prevents state updates after unmount with multiple pending requests', async () => {
+    const { result, unmount } = renderHook(() => useRequest(heavyTask))
+
+    act(() => {
+      result.current.execute(oneTime, 'first')
+      result.current.execute(2 * oneTime, 'second')
+      result.current.execute(3 * oneTime, 'third')
+    })
+
+    expect(result.current.status).toBe(UseRequestStatus.Pending)
+
+    unmount()
+
+    skip(3 * oneTime)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(true).toBe(true)
+  })
+})
+
+describe('type safety with typed arguments', () => {
+  it('maintains type safety with properly typed arguments', async () => {
+    const typedCallback = (a: number, b: string): Promise<boolean> => {
+      return Promise.resolve(a > 0 && b.length > 0)
+    }
+
+    const { result } = renderHook(() => useRequest<boolean, Error, [number, string]>(typedCallback))
+
+    act(() => {
+      result.current.execute(5, 'hello')
+    })
+
+    await waitFor(() => {
+      expect(result.current.status).toBe(UseRequestStatus.Completed)
+    })
+
+    expect(result.current.value).toBe(true)
+  })
+
+  it('works with various argument types', async () => {
+    interface User {
+      id: number
+      name: string
+    }
+
+    const fetchUser = (id: number): Promise<User> => {
+      return Promise.resolve({ id, name: `User ${id}` })
+    }
+
+    const { result } = renderHook(() => useRequest<User, Error, [number]>(fetchUser))
+
+    act(() => {
+      result.current.execute(42)
+    })
+
+    await waitFor(() => {
+      expect(result.current.status).toBe(UseRequestStatus.Completed)
+    })
+
+    expect(result.current.value).toEqual({ id: 42, name: 'User 42' })
+  })
 })

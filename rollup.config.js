@@ -1,10 +1,14 @@
 import typescript from '@rollup/plugin-typescript'
-import { terser } from 'rollup-plugin-terser'
-import pkg from './package.json'
+import terser from '@rollup/plugin-terser'
+import { createRequire } from 'module'
+
+const require = createRequire(import.meta.url)
+const pkg = require('./package.json')
 
 export default [
   {
     input: 'src/browser.tsx',
+    external: ['react'],
     plugins: [typescript(), terser()],
     output: {
       file: pkg.browser,
@@ -12,7 +16,6 @@ export default [
       name: 'useRequest',
       exports: 'default',
       sourcemap: true,
-      interop: false,
       globals: {
         react: 'React',
       },
@@ -20,6 +23,7 @@ export default [
   },
   {
     input: 'src/index.tsx',
+    external: ['react'],
     output: [
       {
         file: pkg.main,

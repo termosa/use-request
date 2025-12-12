@@ -12,16 +12,28 @@
   "author": "termosa",
   "license": "MIT",
   "repository": "termosa/use-request",
-  "homepage": "http://gh.me.st/use-request/",
+  "homepage": "https://gh.me.st/use-request/",
   "main": "dist/index.js",
   "module": "dist/index.es.js",
   "browser": "dist/index.umd.min.js",
   "unpkg": "dist/index.umd.min.js",
   "types": "dist/index.d.ts",
-  "jsnext:main": "dist/index.es.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.es.js",
+      "require": "./dist/index.js",
+      "browser": "./dist/index.umd.min.js"
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "src/index.tsx"
+  ],
   "engines": {
-    "node": ">=8",
-    "npm": ">=5"
+    "node": ">=18",
+    "npm": ">=9"
   },
   "scripts": {
     "test": "cross-env CI=1 react-scripts test --env=jsdom",
@@ -36,21 +48,22 @@
     "react": "^17.0.0 || ^18.0.0 || ^19.0.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.2.2",
-    "@babel/runtime": "^7.3.1",
-    "@rollup/plugin-babel": "^5.2.0",
-    "@rollup/plugin-typescript": "^5.0.2",
-    "@testing-library/react-hooks": "^3.2.1",
-    "@types/jest": "^23.3.13",
-    "@types/react": "^18.0.00",
-    "cross-env": "^5.2.0",
+    "@babel/core": "^7.24.0",
+    "@babel/runtime": "^7.24.0",
+    "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "@testing-library/react": "^14.2.1",
+    "@types/jest": "^29.5.12",
+    "@types/react": "^18.2.64",
+    "cross-env": "^7.0.3",
     "gh-pages": "^6.1.1",
-    "react": "^18.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "react-scripts": "^5.0.1",
-    "react-test-renderer": "^18.3.1",
-    "rollup": "^2.26.9",
-    "rollup-plugin-terser": "^7.0.2",
+    "react-test-renderer": "^18.2.0",
+    "rollup": "^4.12.0",
     "tslib": "^2.6.3",
-    "typescript": "^4.7.4"
+    "typescript": "^5.4.2"
   }
 }
