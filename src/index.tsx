@@ -7,51 +7,158 @@ export enum UseRequestStatus {
   Failed = 'failed',
 }
 
+export type PatchedState = false | 'manual' | 'auto'
+
+export interface UseRequestOptions<Value, Arguments extends unknown[]> {
+  deps?: Arguments | null
+  autoPatch?: Value | ((args: Arguments) => Value)
+}
+
 export function useRequest<Value, ErrorValue extends unknown = unknown, Arguments extends unknown[] = unknown[]>(
   request: (...args: [...Arguments, ...any[]]) => Promise<Value> | Value,
-  deps?: Arguments | null
+  options?: Arguments | UseRequestOptions<Value, Arguments> | null
 ): Request<Value, ErrorValue, Arguments> {
+  // Normalize options: array = legacy deps, object = new options
+  const opts: UseRequestOptions<Value, Arguments> = Array.isArray(options) || options === null
+    ? { deps: options }
+    : (options || {})
+  
+  const { deps, autoPatch } = opts
+
   const processesRef = React.useRef(0)
   const lastCompletedProcessRef = React.useRef(0)
 
   const requestRef = React.useRef(request)
   requestRef.current = request
 
-  const stateRef = React.useRef<State<Value, ErrorValue>>({
+  const autoPatchRef = React.useRef(autoPatch)
+  autoPatchRef.current = autoPatch
+
+  // Real state from actual request (for resetPatch)
+  const realStateRef = React.useRef<{ value?: Value; error?: ErrorValue }>({})
+
+  const stateRef = React.useRef<InternalState<Value, ErrorValue>>({
     status: deps ? UseRequestStatus.Pending : UseRequestStatus.Idle,
+    patched: false,
   })
   const [state, setState] = React.useState(stateRef.current)
-  const update = (newState: State<Value, ErrorValue>): void => {
+  const update = (newState: InternalState<Value, ErrorValue>): void => {
     stateRef.current = newState
     setState(newState)
   }
 
-  const reset = React.useCallback(() => update({ status: UseRequestStatus.Idle }), [])
+  const reset = React.useCallback(() => {
+    realStateRef.current = {}
+    update({ status: UseRequestStatus.Idle, patched: false })
+  }, [])
+
+  const resetPatch = React.useCallback(() => {
+    const real = realStateRef.current
+    const hasValue = 'value' in real
+    const hasError = 'error' in real
+    
+    let status: UseRequestStatus
+    if (!hasValue && !hasError) {
+      status = UseRequestStatus.Idle
+    } else if (hasError) {
+      status = UseRequestStatus.Failed
+    } else {
+      status = UseRequestStatus.Completed
+    }
+
+    update({
+      status,
+      value: real.value,
+      error: real.error,
+      patched: false,
+    })
+  }, [])
+
+  const patch = React.useCallback((
+    input: PatchInput<Value, ErrorValue> | ((current: { value?: Value; error?: ErrorValue }) => PatchInput<Value, ErrorValue>)
+  ) => {
+    const current = { value: stateRef.current.value, error: stateRef.current.error }
+    const newPatch = typeof input === 'function' ? input(current) : input
+
+    let status: UseRequestStatus
+    if ('error' in newPatch && newPatch.error !== undefined) {
+      status = UseRequestStatus.Failed
+    } else if ('value' in newPatch && newPatch.value !== undefined) {
+      status = UseRequestStatus.Completed
+    } else {
+      status = UseRequestStatus.Idle
+    }
+
+    update({
+      status,
+      value: newPatch.value,
+      error: newPatch.error,
+      patched: 'manual',
+    })
+  }, [])
+
+  const patchValue = React.useCallback((
+    input: Value | ((current: Value | undefined) => Value)
+  ) => {
+    const currentValue = stateRef.current.value
+    const newValue = typeof input === 'function' ? (input as (current: Value | undefined) => Value)(currentValue) : input
+
+    update({
+      status: UseRequestStatus.Completed,
+      value: newValue,
+      error: undefined,
+      patched: 'manual',
+    })
+  }, [])
 
   const execute = React.useCallback((...args: Arguments) => {
     const processIndex = ++processesRef.current
-    update({
-      ...stateRef.current,
-      status: UseRequestStatus.Pending,
-    })
+
+    // Apply autoPatch if configured
+    const autoPatchValue = autoPatchRef.current
+    if (autoPatchValue !== undefined) {
+      const patchedValue = typeof autoPatchValue === 'function'
+        ? (autoPatchValue as (args: Arguments) => Value)(args)
+        : autoPatchValue
+
+      update({
+        status: UseRequestStatus.Pending,
+        value: patchedValue,
+        error: undefined,
+        patched: 'auto',
+      })
+    } else {
+      update({
+        ...stateRef.current,
+        status: UseRequestStatus.Pending,
+      })
+    }
 
     const promise = new Promise<Value>((resolve) => resolve(requestRef.current(...(args as any))))
     promise.then(
       (response: Value) => {
         if (processIndex > lastCompletedProcessRef.current) {
           lastCompletedProcessRef.current = processIndex
+          realStateRef.current = { value: response }
           update({
             status: processIndex === processesRef.current ? UseRequestStatus.Completed : stateRef.current.status,
             value: response,
+            error: undefined,
+            patched: false,
           })
         }
       },
       (error: ErrorValue) => {
         if (processIndex > lastCompletedProcessRef.current) {
           lastCompletedProcessRef.current = processIndex
+          realStateRef.current = { ...realStateRef.current, error }
+          // Keep patched value on error, but clear value if not patched (original behavior)
+          const keepValue = stateRef.current.patched !== false
           update({
             status: processIndex === processesRef.current ? UseRequestStatus.Failed : stateRef.current.status,
+            value: keepValue ? stateRef.current.value : undefined,
             error,
+            patched: stateRef.current.patched,
           })
         }
       }
@@ -72,35 +179,57 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
 
   return React.useMemo(
     () => ({
-      ...state,
+      value: state.value,
+      error: state.error,
+      status: state.status,
+      patched: state.patched,
       reset,
+      resetPatch,
+      patch,
+      patchValue,
       execute,
       idle: state.status === UseRequestStatus.Idle,
       pending: state.status === UseRequestStatus.Pending,
       completed: state.status === UseRequestStatus.Completed,
       failed: state.status === UseRequestStatus.Failed,
     }),
-    [state, reset, execute]
+    [state, reset, resetPatch, patch, patchValue, execute]
   )
 }
 
 export default useRequest
 
-export interface State<Value, ErrorValue> {
+interface InternalState<Value, ErrorValue> {
+  status: UseRequestStatus
+  value?: Value | undefined
+  error?: ErrorValue | undefined
+  patched: PatchedState
+}
+
+export interface State<Value = unknown, ErrorValue = unknown> {
   status: UseRequestStatus
   value?: Value | undefined
   error?: ErrorValue | undefined
 }
 
+export interface PatchInput<Value, ErrorValue> {
+  value?: Value
+  error?: ErrorValue
+}
+
 export interface Request<
-  Value extends unknown = unknown,
-  ErrorValue extends unknown = unknown,
+  Value = unknown,
+  ErrorValue = unknown,
   Args extends unknown[] = unknown[]
 > extends State<Value, ErrorValue> {
   idle: boolean
   pending: boolean
   completed: boolean
   failed: boolean
+  patched: PatchedState
   reset: () => void
+  resetPatch: () => void
+  patch: (input: PatchInput<Value, ErrorValue> | ((current: { value?: Value; error?: ErrorValue }) => PatchInput<Value, ErrorValue>)) => void
+  patchValue: (input: Value | ((current: Value | undefined) => Value)) => void
   execute: (...args: Args) => Promise<Value>
 }
