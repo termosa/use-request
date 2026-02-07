@@ -4,6 +4,10 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 :root {
   --bg: #08090d;
   --bg-card: #0f1118;
@@ -89,7 +93,7 @@ body::after {
   top: -120px;
   left: 50%;
   transform: translateX(-50%);
-  width: 600px;
+  width: min(600px, 150vw);
   height: 400px;
   background: radial-gradient(ellipse, rgba(91,124,250,0.12) 0%, rgba(149,128,255,0.06) 40%, transparent 70%);
   pointer-events: none;
@@ -310,7 +314,6 @@ body::after {
   max-width: 960px;
   margin: 0 auto 80px;
   padding: 0 24px;
-  overflow-x: hidden;
 }
 
 .section-title {
@@ -396,6 +399,7 @@ body::after {
   min-width: 0;
   border-right: 1px solid var(--border);
   background: var(--bg-code);
+  overflow: hidden;
 }
 
 .example-code pre {
@@ -406,6 +410,7 @@ body::after {
   line-height: 1.75;
   overflow-x: auto;
   color: var(--text);
+  max-width: 100%;
 }
 
 .example-preview {
