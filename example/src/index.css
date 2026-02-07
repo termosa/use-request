@@ -87,6 +87,13 @@ body::after {
   animation: fadeUp 0.8s ease-out;
 }
 
+.hero-logo {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 24px;
+  animation: fadeUp 0.6s ease-out;
+}
+
 .hero::before {
   content: '';
   position: absolute;

@@ -133,6 +133,7 @@ const App = () => (
   <div>
     {/* Hero */}
     <header className="hero">
+      <img src={process.env.PUBLIC_URL + '/logo.png'} alt="use-request" className="hero-logo" />
       <h1><span>use-request</span> <span className="version">v{pkg.version}</span></h1>
       <p className="tagline">Async state management for React. Simple, typed, powerful.</p>
       <InstallCmd />
