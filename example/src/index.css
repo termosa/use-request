@@ -450,7 +450,7 @@ body::after {
   padding: 8px 12px;
   color: var(--text);
   font-family: var(--sans);
-  font-size: 0.82rem;
+  font-size: 16px; /* Prevents zoom on iOS */
   width: 100%;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
