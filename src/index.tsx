@@ -49,6 +49,8 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
   }
 
   const reset = React.useCallback(() => {
+    // Invalidate any pending requests so they can't override this reset
+    lastCompletedProcessRef.current = processesRef.current
     realStateRef.current = {}
     patchedAtProcessRef.current = 0
     update({ status: UseRequestStatus.Idle, patched: false })
@@ -92,6 +94,8 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
       status = UseRequestStatus.Idle
     }
 
+    // Invalidate any pending requests so they can't override this patch
+    lastCompletedProcessRef.current = processesRef.current
     patchedAtProcessRef.current = processesRef.current + 1
     update({
       status,
@@ -107,6 +111,8 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
     const currentValue = stateRef.current.value
     const newValue = typeof input === 'function' ? (input as (current: Value | undefined) => Value)(currentValue) : input
 
+    // Invalidate any pending requests so they can't override this patch
+    lastCompletedProcessRef.current = processesRef.current
     patchedAtProcessRef.current = processesRef.current + 1
     update({
       status: UseRequestStatus.Completed,

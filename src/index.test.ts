@@ -547,12 +547,14 @@ it('cancel all requests in queue when state is reset', async () => {
   expectStatus(UseRequestStatus.Idle, result.current)
   expect(result.current.value).toBeUndefined()
 
-  skip(oneTime)
+  // Pending requests resolve but should NOT update state (no waitForNextUpdate needed)
+  await act(async () => {
+    jest.advanceTimersByTime(3 * oneTime)
+    await Promise.resolve()
+  })
 
   expectStatus(UseRequestStatus.Idle, result.current)
   expect(result.current.value).toBeUndefined()
-
-  await waitForNextUpdate()
 })
 
 it('is not triggered when callback function is updated', async () => {
@@ -959,7 +961,7 @@ describe('optimisticPatch option', () => {
 // Stale request handling tests
 describe('stale request handling', () => {
   it('does not override manual patch with stale request result', async () => {
-    const { result, waitForNextUpdate } = renderHook(() => useRequest(heavyTask))
+    const { result } = renderHook(() => useRequest(heavyTask))
 
     // Start a slow request
     act(() => {
@@ -976,16 +978,18 @@ describe('stale request handling', () => {
     expect(result.current.value).toBe('patched')
     expect(result.current.patched).toBe('manual')
 
-    // Stale request resolves - should NOT override the patch
-    skip(2 * oneTime)
-    await waitForNextUpdate()
+    // Stale request resolves - should NOT override the patch (no state change expected)
+    await act(async () => {
+      jest.advanceTimersByTime(2 * oneTime)
+      await Promise.resolve() // flush promises
+    })
 
     expect(result.current.value).toBe('patched')
     expect(result.current.patched).toBe('manual')
   })
 
   it('does not override manual patch when multiple requests are in flight', async () => {
-    const { result, waitForNextUpdate } = renderHook(() => useRequest(heavyTask))
+    const { result } = renderHook(() => useRequest(heavyTask))
 
     // Start request A (slow)
     act(() => {
@@ -1004,20 +1008,25 @@ describe('stale request handling', () => {
 
     expect(result.current.value).toBe('patched')
 
-    // B completes first - should NOT override patch
-    skip(oneTime)
-    await waitForNextUpdate()
+    // B completes first - should NOT override patch (no state change expected)
+    await act(async () => {
+      jest.advanceTimersByTime(oneTime)
+      await Promise.resolve()
+    })
 
     expect(result.current.value).toBe('patched')
 
     // A completes later - should NOT override patch
-    skip(2 * oneTime)
+    await act(async () => {
+      jest.advanceTimersByTime(2 * oneTime)
+      await Promise.resolve()
+    })
 
     expect(result.current.value).toBe('patched')
   })
 
   it('does not override reset with pending request result', async () => {
-    const { result, waitForNextUpdate } = renderHook(() => useRequest(heavyTask))
+    const { result } = renderHook(() => useRequest(heavyTask))
 
     // Start a slow request
     act(() => {
@@ -1034,9 +1043,11 @@ describe('stale request handling', () => {
     expectStatus(UseRequestStatus.Idle, result.current)
     expect(result.current.value).toBeUndefined()
 
-    // Pending request resolves - should NOT fill state back in
-    skip(2 * oneTime)
-    await waitForNextUpdate()
+    // Pending request resolves - should NOT fill state back in (no state change expected)
+    await act(async () => {
+      jest.advanceTimersByTime(2 * oneTime)
+      await Promise.resolve()
+    })
 
     expectStatus(UseRequestStatus.Idle, result.current)
     expect(result.current.value).toBeUndefined()
