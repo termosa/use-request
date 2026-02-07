@@ -39,6 +39,7 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 /* Noise overlay */
@@ -309,6 +310,7 @@ body::after {
   max-width: 960px;
   margin: 0 auto 80px;
   padding: 0 24px;
+  overflow-x: hidden;
 }
 
 .section-title {
@@ -635,7 +637,7 @@ body::after {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 .api-ref table {
@@ -801,4 +803,18 @@ body::after {
   .feature-card:last-child { border-radius: 0 0 var(--radius) var(--radius) !important; }
 
   .hero h1 { font-size: 2rem; }
+
+  .api-ref table {
+    font-size: 0.75rem;
+  }
+  
+  .api-ref th,
+  .api-ref td {
+    padding: 8px 12px;
+  }
+  
+  .api-ref code {
+    font-size: 0.68rem;
+    padding: 1px 5px;
+  }
 }
