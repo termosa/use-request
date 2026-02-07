@@ -4,6 +4,10 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 :root {
   --bg: #08090d;
   --bg-card: #0f1118;
@@ -39,6 +43,7 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 /* Noise overlay */
@@ -82,13 +87,20 @@ body::after {
   animation: fadeUp 0.8s ease-out;
 }
 
+.hero-logo {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 24px;
+  animation: fadeUp 0.6s ease-out;
+}
+
 .hero::before {
   content: '';
   position: absolute;
   top: -120px;
   left: 50%;
   transform: translateX(-50%);
-  width: 600px;
+  width: min(600px, 150vw);
   height: 400px;
   background: radial-gradient(ellipse, rgba(91,124,250,0.12) 0%, rgba(149,128,255,0.06) 40%, transparent 70%);
   pointer-events: none;
@@ -394,6 +406,7 @@ body::after {
   min-width: 0;
   border-right: 1px solid var(--border);
   background: var(--bg-code);
+  overflow: hidden;
 }
 
 .example-code pre {
@@ -404,6 +417,7 @@ body::after {
   line-height: 1.75;
   overflow-x: auto;
   color: var(--text);
+  max-width: 100%;
 }
 
 .example-preview {
@@ -443,7 +457,7 @@ body::after {
   padding: 8px 12px;
   color: var(--text);
   font-family: var(--sans);
-  font-size: 0.82rem;
+  font-size: 16px; /* Prevents zoom on iOS */
   width: 100%;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -635,7 +649,7 @@ body::after {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 .api-ref table {
@@ -801,4 +815,18 @@ body::after {
   .feature-card:last-child { border-radius: 0 0 var(--radius) var(--radius) !important; }
 
   .hero h1 { font-size: 2rem; }
+
+  .api-ref table {
+    font-size: 0.75rem;
+  }
+  
+  .api-ref th,
+  .api-ref td {
+    padding: 8px 12px;
+  }
+  
+  .api-ref code {
+    font-size: 0.68rem;
+    padding: 1px 5px;
+  }
 }
