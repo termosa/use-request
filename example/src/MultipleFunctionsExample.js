@@ -3,80 +3,43 @@ import useResources, { UseRequestStatus } from './useResources'
 
 const MultipleFunctionsExample = () => {
   /** @type {React.MutableRefObject<null | HTMLInputElement>} */
-  const resourceLabelRef = useRef(null)
+  const inputRef = useRef(null)
   const { resources, status, create, remove } = useResources()
 
   const onSubmit = (e) => {
     e.preventDefault()
-    if (!resourceLabelRef.current) return
-    create({ label: resourceLabelRef.current.value })
-    resourceLabelRef.current.value = ''
+    if (!inputRef.current) return
+    create({ label: inputRef.current.value })
+    inputRef.current.value = ''
   }
 
   return (
     <div>
-      <form onSubmit={onSubmit}>
-        <input type="text" ref={resourceLabelRef} required />
-        <input type="submit" value="Add" />
+      <form onSubmit={onSubmit} className="resource-form">
+        <input className="demo-input" type="text" ref={inputRef} placeholder="New item..." required />
+        <button className="demo-btn" type="submit">Add</button>
       </form>
 
-      {!resources && status === UseRequestStatus.Pending ? <p>Loading...</p> : null}
+      {!resources && status === UseRequestStatus.Pending && (
+        <div style={{ marginTop: 12 }}>
+          <span className="demo-spinner" /> Loading...
+        </div>
+      )}
 
-      {resources ? (
-        <ol>
+      {resources && (
+        <ul className="resource-list">
           {resources.map((res) => (
             <li key={res.id}>
-              {res.label} <input type="button" onClick={() => remove(res.id)} value="remove" />
+              <span>{res.label}</span>
+              <button className="demo-btn demo-btn-sm demo-btn-danger" onClick={() => remove(res.id)}>
+                remove
+              </button>
             </li>
           ))}
-        </ol>
-      ) : null}
+        </ul>
+      )}
     </div>
   )
 }
 
 export default MultipleFunctionsExample
-
-export const code = `const useResources = () => {
-  const { execute: reload, value: resources, status } = useRequest(api.get, []);
-  const { execute: create } = useRequest(resource => api.post(resource).then(reload));
-  const { execute: remove } = useRequest(id => api.delete(id).then(reload));
-
-  return { resources, status, create, remove };
-};
-
-const MultipleFunctionsExample = () => {
-  const resourceLabelRef = useRef(null);
-  const { resources, status, create, remove } = useResources();
-
-  const onSubmit = e => {
-    e.preventDefault();
-    if (!resourceLabelRef.current) return
-    create({ label: resourceLabelRef.current.value });
-    resourceLabelRef.current.value = '';
-  };
-
-  return (
-    <div>
-      <form onSubmit={onSubmit}>
-        <input type="text" ref={resourceLabelRef} required />
-        <input type="submit" value="Add" />
-      </form>
-
-      {!resources && status === UseRequestStatus.Pending ? <p>Loading...</p> : null}
-
-      {resources
-        ? <ol>
-          {resources.map(res => (
-            <li key={res.id}>
-              {res.label}
-              {' '}
-              <input type="button" onClick={() => remove(res.id)} value="remove" />
-            </li>
-          ))}
-        </ol>
-        : null
-      }
-    </div>
-  );
-};`

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx react-scripts build:*)"
+    ]
+  }
+}

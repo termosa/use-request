@@ -1,4 +1,4 @@
-import useRequest, { UseRequestStatus, Request } from './'
+import useRequest, { UseRequestStatus } from './'
 import { renderHook, act } from '@testing-library/react-hooks'
 
 // mock timer using jest
@@ -21,7 +21,7 @@ const skip = (ms: number) =>
     jest.advanceTimersByTime(ms)
   })
 
-const expectStatus = (status: UseRequestStatus, request: Request<any, any, any>) => {
+const expectStatus = (status: UseRequestStatus, request: { status: UseRequestStatus; idle: boolean; pending: boolean; completed: boolean; failed: boolean }) => {
   expect(request.status).toBe(status)
   expect([request.idle, request.pending, request.completed, request.failed]).toEqual([
     request.status === UseRequestStatus.Idle,
@@ -589,4 +589,369 @@ it('executes the last given callback', async () => {
 
   expectStatus(UseRequestStatus.Completed, result.current)
   expect(result.current.value).toBe(456)
+})
+
+// Options object syntax tests
+describe('options object syntax', () => {
+  it('accepts options object with deps', async () => {
+    const { result, waitForNextUpdate } = renderHook(() => useRequest(asyncDivision, { deps: [6, 2] }))
+
+    expectStatus(UseRequestStatus.Pending, result.current)
+
+    await waitForNextUpdate()
+
+    expectStatus(UseRequestStatus.Completed, result.current)
+    expect(result.current.value).toBe(3)
+  })
+
+  it('accepts options object with null deps', async () => {
+    const { result } = renderHook(() => useRequest(asyncDivision, { deps: null }))
+
+    expectStatus(UseRequestStatus.Idle, result.current)
+  })
+
+  it('accepts options object without deps', async () => {
+    const { result } = renderHook(() => useRequest(asyncDivision, {}))
+
+    expectStatus(UseRequestStatus.Idle, result.current)
+  })
+})
+
+// Patched state tests
+describe('patched property', () => {
+  it('starts with patched: false', () => {
+    const { result } = renderHook(() => useRequest(() => 123))
+
+    expect(result.current.patched).toBe(false)
+  })
+
+  it('remains false after successful request', async () => {
+    const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 123, []))
+
+    await waitForNextUpdate()
+
+    expect(result.current.patched).toBe(false)
+  })
+
+  it('remains false after failed request', async () => {
+    const { result, waitForNextUpdate } = renderHook(() => useRequest(() => Promise.reject('error'), []))
+
+    await waitForNextUpdate()
+
+    expect(result.current.patched).toBe(false)
+  })
+})
+
+// patch() method tests
+describe('patch() method', () => {
+  it('patches value and sets patched to manual', () => {
+    const { result } = renderHook(() => useRequest(() => 123))
+
+    act(() => {
+      result.current.patch({ value: 456 })
+    })
+
+    expect(result.current.value).toBe(456)
+    expect(result.current.error).toBeUndefined()
+    expect(result.current.patched).toBe('manual')
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
+
+  it('patches error and sets patched to manual', () => {
+    const { result } = renderHook(() => useRequest(() => 123))
+
+    act(() => {
+      result.current.patch({ error: 'manual error' })
+    })
+
+    expect(result.current.value).toBeUndefined()
+    expect(result.current.error).toBe('manual error')
+    expect(result.current.patched).toBe('manual')
+    expectStatus(UseRequestStatus.Failed, result.current)
+  })
+
+  it('patches both value and error', () => {
+    const { result } = renderHook(() => useRequest(() => 123))
+
+    act(() => {
+      result.current.patch({ value: 456, error: 'some error' })
+    })
+
+    expect(result.current.value).toBe(456)
+    expect(result.current.error).toBe('some error')
+    expect(result.current.patched).toBe('manual')
+  })
+
+  it('replaces state entirely (does not merge)', async () => {
+    const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 123, []))
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe(123)
+
+    act(() => {
+      result.current.patch({ error: 'only error' })
+    })
+
+    expect(result.current.value).toBeUndefined()
+    expect(result.current.error).toBe('only error')
+  })
+
+  it('accepts function that receives current state', async () => {
+    const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 10, []))
+
+    await waitForNextUpdate()
+
+    act(() => {
+      result.current.patch((current) => ({ value: (current.value || 0) * 2 }))
+    })
+
+    expect(result.current.value).toBe(20)
+    expect(result.current.patched).toBe('manual')
+  })
+})
+
+// patchValue() method tests
+describe('patchValue() method', () => {
+  it('patches value directly', () => {
+    const { result } = renderHook(() => useRequest(() => 123))
+
+    act(() => {
+      result.current.patchValue(456)
+    })
+
+    expect(result.current.value).toBe(456)
+    expect(result.current.error).toBeUndefined()
+    expect(result.current.patched).toBe('manual')
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
+
+  it('accepts function that receives current value', async () => {
+    const { result, waitForNextUpdate } = renderHook(() => useRequest(() => [1, 2, 3], []))
+
+    await waitForNextUpdate()
+
+    act(() => {
+      result.current.patchValue((current) => [...(current || []), 4])
+    })
+
+    expect(result.current.value).toEqual([1, 2, 3, 4])
+    expect(result.current.patched).toBe('manual')
+  })
+
+  it('clears error when patching value', async () => {
+    const { result, waitForNextUpdate } = renderHook(() => useRequest<number>(() => Promise.reject('error'), []))
+
+    await waitForNextUpdate()
+
+    expect(result.current.error).toBe('error')
+
+    act(() => {
+      result.current.patchValue(123)
+    })
+
+    expect(result.current.value).toBe(123)
+    expect(result.current.error).toBeUndefined()
+  })
+})
+
+// resetPatch() method tests
+describe('resetPatch() method', () => {
+  it('restores last real value after manual patch', async () => {
+    const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 123, []))
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe(123)
+
+    act(() => {
+      result.current.patchValue(456)
+    })
+
+    expect(result.current.value).toBe(456)
+    expect(result.current.patched).toBe('manual')
+
+    act(() => {
+      result.current.resetPatch()
+    })
+
+    expect(result.current.value).toBe(123)
+    expect(result.current.patched).toBe(false)
+  })
+
+  it('restores to idle if no real state exists', () => {
+    const { result } = renderHook(() => useRequest(() => 123))
+
+    act(() => {
+      result.current.patchValue(456)
+    })
+
+    expect(result.current.value).toBe(456)
+
+    act(() => {
+      result.current.resetPatch()
+    })
+
+    expect(result.current.value).toBeUndefined()
+    expectStatus(UseRequestStatus.Idle, result.current)
+    expect(result.current.patched).toBe(false)
+  })
+
+  it('restores error state if last real request failed', async () => {
+    const { result, waitForNextUpdate } = renderHook(() => useRequest<number>(() => Promise.reject('real error'), []))
+
+    await waitForNextUpdate()
+
+    act(() => {
+      result.current.patchValue(123)
+    })
+
+    expect(result.current.value).toBe(123)
+    expect(result.current.error).toBeUndefined()
+
+    act(() => {
+      result.current.resetPatch()
+    })
+
+    expect(result.current.error).toBe('real error')
+    expectStatus(UseRequestStatus.Failed, result.current)
+  })
+})
+
+// reset() clears patches
+describe('reset() with patches', () => {
+  it('clears patches when reset is called', async () => {
+    const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 123, []))
+
+    await waitForNextUpdate()
+
+    act(() => {
+      result.current.patchValue(456)
+    })
+
+    expect(result.current.patched).toBe('manual')
+
+    act(() => {
+      result.current.reset()
+    })
+
+    expect(result.current.value).toBeUndefined()
+    expect(result.current.patched).toBe(false)
+    expectStatus(UseRequestStatus.Idle, result.current)
+  })
+})
+
+// optimisticPatch option tests
+describe('optimisticPatch option', () => {
+  it('applies optimisticPatch value immediately on execute', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest(
+        () => heavyTask(oneTime, 'real'),
+        { optimisticPatch: 'optimistic' }
+      )
+    )
+
+    act(() => {
+      result.current.execute()
+    })
+
+    expect(result.current.value).toBe('optimistic')
+    expect(result.current.patched).toBe('auto')
+    expectStatus(UseRequestStatus.Pending, result.current)
+
+    skip(oneTime)
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe('real')
+    expect(result.current.patched).toBe(false)
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
+
+  it('applies optimisticPatch function with args', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest(
+        (id: number) => heavyTask(oneTime, `item-${id}`),
+        { optimisticPatch: (args) => `loading-${args[0]}` }
+      )
+    )
+
+    act(() => {
+      result.current.execute(42)
+    })
+
+    expect(result.current.value).toBe('loading-42')
+    expect(result.current.patched).toBe('auto')
+
+    skip(oneTime)
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe('item-42')
+    expect(result.current.patched).toBe(false)
+  })
+
+  it('keeps patched value on failure', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest(
+        () => Promise.reject('error'),
+        { optimisticPatch: 'optimistic' }
+      )
+    )
+
+    act(() => {
+      result.current.execute()
+    })
+
+    expect(result.current.value).toBe('optimistic')
+    expect(result.current.patched).toBe('auto')
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe('optimistic')
+    expect(result.current.error).toBe('error')
+    expect(result.current.patched).toBe('auto')
+    expectStatus(UseRequestStatus.Failed, result.current)
+  })
+
+  it('can resetPatch after optimisticPatch failure', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest(
+        () => Promise.reject('error'),
+        { optimisticPatch: 'optimistic' }
+      )
+    )
+
+    act(() => {
+      result.current.execute()
+    })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe('optimistic')
+
+    act(() => {
+      result.current.resetPatch()
+    })
+
+    expect(result.current.value).toBeUndefined()
+    expect(result.current.error).toBe('error')
+    expect(result.current.patched).toBe(false)
+  })
+
+  it('works with deps option', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest(
+        (id: number) => heavyTask(oneTime, `item-${id}`),
+        { deps: [1], optimisticPatch: (args) => `loading-${args[0]}` }
+      )
+    )
+
+    expect(result.current.value).toBe('loading-1')
+    expect(result.current.patched).toBe('auto')
+
+    skip(oneTime)
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe('item-1')
+    expect(result.current.patched).toBe(false)
+  })
 })
