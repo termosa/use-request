@@ -1,57 +1,33 @@
 import React from 'react'
 import useRequest from 'use-request'
 
-const generateNumber = (max) =>
-  new Promise((resolve, reject) => {
-    if (max > 0) setTimeout(resolve, 2e3, Math.round(Math.random() * max))
-    else setTimeout(reject, 2e3, 'Max value must be greater than zero')
-  })
-
-const defaultMax = 100
+const wait = (s) => new Promise((resolve) => setTimeout(resolve, s * 1e3))
 
 const SingleFunctionExample = () => {
-  const [max, setMax] = React.useState('')
+  const [input, setInput] = React.useState(() => Math.round(Math.random() * 100))
+  const { value, pending, idle, execute } = useRequest((num) => wait(2).then(() => num))
 
-  const { value, error, pending } = useRequest(
-    generateNumber, // Async function that returns promise
-    [max ? +max : defaultMax] // Initial arguments
-  )
+  const handleClick = () => {
+    execute(input)
+    setInput(Math.round(Math.random() * 100))
+  }
 
   return (
     <div>
-      <div>
-        <input type="number" value={max} placeholder={defaultMax.toString()} onChange={(e) => setMax(e.target.value)} />
-        {pending ? <span> processing</span> : null}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button className="demo-btn" onClick={handleClick}>
+          execute({input})
+        </button>
+        <span className={`demo-status ${idle ? 'idle' : pending ? 'pending' : 'completed'}`}>
+          {pending && <span className="demo-spinner" />}
+          {idle ? 'idle' : pending ? 'pending' : 'completed'}
+        </span>
       </div>
-      {value !== undefined ? <div>Last result: {value}</div> : null}
-      {error ? <div>Error: {error}</div> : null}
+      {value !== undefined && (
+        <div className="demo-result">value: {value}</div>
+      )}
     </div>
   )
 }
 
 export default SingleFunctionExample
-
-export const code = `const SingleFunctionExample = () => {
-  const [max, setMax] = React.useState('');
-
-  const { value, error, pending } = useRequest(
-    generateNumber,           // Async function that returns promise
-    [max ? +max : defaultMax] // Initial arguments
-  );
-
-  return (
-    <div>
-      <div>
-        <input
-          type="number"
-          value={max}
-          placeholder={defaultMax.toString()}
-          onChange={e => setMax(e.target.value)}
-        />
-        {pending ? <span> processing</span> : null}
-      </div>
-      {value !== undefined ? <div>Last result: {value}</div> : null}
-      {error ? <div>Error: {error}</div> : null}
-    </div>
-  );
-};`
