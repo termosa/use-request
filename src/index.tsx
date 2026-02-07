@@ -27,6 +27,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
 
   const processesRef = React.useRef(0)
   const lastCompletedProcessRef = React.useRef(0)
+  const patchedAtProcessRef = React.useRef(0)
 
   const requestRef = React.useRef(request)
   requestRef.current = request
@@ -49,6 +50,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
 
   const reset = React.useCallback(() => {
     realStateRef.current = {}
+    patchedAtProcessRef.current = 0
     update({ status: UseRequestStatus.Idle, patched: false })
   }, [])
 
@@ -66,6 +68,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
       status = UseRequestStatus.Completed
     }
 
+    patchedAtProcessRef.current = 0
     update({
       status,
       value: real.value,
@@ -89,6 +92,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
       status = UseRequestStatus.Idle
     }
 
+    patchedAtProcessRef.current = processesRef.current + 1
     update({
       status,
       value: newPatch.value,
@@ -103,6 +107,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
     const currentValue = stateRef.current.value
     const newValue = typeof input === 'function' ? (input as (current: Value | undefined) => Value)(currentValue) : input
 
+    patchedAtProcessRef.current = processesRef.current + 1
     update({
       status: UseRequestStatus.Completed,
       value: newValue,
@@ -121,6 +126,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
         ? (autoPatchValue as (args: Arguments) => Value)(args)
         : autoPatchValue
 
+      patchedAtProcessRef.current = processIndex
       update({
         status: UseRequestStatus.Pending,
         value: patchedValue,
@@ -138,6 +144,11 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
     promise.then(
       (response: Value) => {
         if (processIndex > lastCompletedProcessRef.current) {
+          // Skip: request was fired before state was patched, so its result is stale
+          if (stateRef.current.patched !== false && processIndex < patchedAtProcessRef.current) {
+            lastCompletedProcessRef.current = processIndex
+            return
+          }
           lastCompletedProcessRef.current = processIndex
           realStateRef.current = { value: response }
           update({
@@ -150,6 +161,11 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
       },
       (error: ErrorValue) => {
         if (processIndex > lastCompletedProcessRef.current) {
+          // Skip: request was fired before state was patched, so its result is stale
+          if (stateRef.current.patched !== false && processIndex < patchedAtProcessRef.current) {
+            lastCompletedProcessRef.current = processIndex
+            return
+          }
           lastCompletedProcessRef.current = processIndex
           realStateRef.current = { ...realStateRef.current, error }
           // Keep patched value on error, but clear value if not patched (original behavior)
