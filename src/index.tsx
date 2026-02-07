@@ -11,7 +11,7 @@ export type PatchedState = false | 'manual' | 'auto'
 
 export interface UseRequestOptions<Value, Arguments extends unknown[]> {
   deps?: Arguments | null
-  autoPatch?: Value | ((args: Arguments) => Value)
+  optimisticPatch?: Value | ((args: Arguments) => Value)
 }
 
 export function useRequest<Value, ErrorValue extends unknown = unknown, Arguments extends unknown[] = unknown[]>(
@@ -23,7 +23,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
     ? { deps: options }
     : (options || {})
   
-  const { deps, autoPatch } = opts
+  const { deps, optimisticPatch } = opts
 
   const processesRef = React.useRef(0)
   const lastCompletedProcessRef = React.useRef(0)
@@ -32,8 +32,8 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
   const requestRef = React.useRef(request)
   requestRef.current = request
 
-  const autoPatchRef = React.useRef(autoPatch)
-  autoPatchRef.current = autoPatch
+  const optimisticPatchRef = React.useRef(optimisticPatch)
+  optimisticPatchRef.current = optimisticPatch
 
   // Real state from actual request (for resetPatch)
   const realStateRef = React.useRef<{ value?: Value; error?: ErrorValue }>({})
@@ -119,12 +119,12 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
   const execute = React.useCallback((...args: Arguments) => {
     const processIndex = ++processesRef.current
 
-    // Apply autoPatch if configured
-    const autoPatchValue = autoPatchRef.current
-    if (autoPatchValue !== undefined) {
-      const patchedValue = typeof autoPatchValue === 'function'
-        ? (autoPatchValue as (args: Arguments) => Value)(args)
-        : autoPatchValue
+    // Apply optimisticPatch if configured
+    const optimisticPatchValue = optimisticPatchRef.current
+    if (optimisticPatchValue !== undefined) {
+      const patchedValue = typeof optimisticPatchValue === 'function'
+        ? (optimisticPatchValue as (args: Arguments) => Value)(args)
+        : optimisticPatchValue
 
       patchedAtProcessRef.current = processIndex
       update({

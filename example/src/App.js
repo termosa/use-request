@@ -55,7 +55,7 @@ failed   <span class="cm">// rejected</span>
 const optimisticCode = `<span class="kw">const</span> { value, execute } = <span class="fn">useRequest</span>(
   (liked) <span class="op">=></span> api.<span class="fn">toggleLike</span>(liked),
   {
-    <span class="prop">autoPatch</span>: ([liked]) <span class="op">=></span> ({
+    <span class="prop">optimisticPatch</span>: ([liked]) <span class="op">=></span> ({
       liked,
       count: prev.<span class="prop">count</span> + (liked ? <span class="num">1</span> : <span class="num">-1</span>)
     })
@@ -162,7 +162,7 @@ const App = () => (
       <div className="feature-card">
         <div className="icon">++</div>
         <h3>Optimistic Updates</h3>
-        <p>Instant UI feedback with autoPatch. Rolls back automatically on failure.</p>
+        <p>Instant UI feedback with optimisticPatch. Rolls back automatically on failure.</p>
       </div>
     </div>
 
@@ -193,6 +193,45 @@ const App = () => (
       <Example title="Race-safe search" code={raceCode}>
         <RaceExample />
       </Example>
+    </div>
+
+    {/* Arguments */}
+    <div className="section">
+      <h2 className="section-title">Arguments</h2>
+      <div className="api-ref">
+        <table>
+          <thead>
+            <tr>
+              <th>Argument</th>
+              <th>Type</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>request</code></td>
+              <td><code>(...args) =&gt; Promise&lt;T&gt; | T</code></td>
+              <td className="desc">Async or sync function to execute</td>
+            </tr>
+            <tr>
+              <td><code>options</code></td>
+              <td><code>T[] | Options | null</code></td>
+              <td className="desc">Deps array, options object, or null</td>
+            </tr>
+            <tr className="api-group"><td colSpan={3}>Options object</td></tr>
+            <tr>
+              <td><code>deps</code></td>
+              <td><code>T[] | null</code></td>
+              <td className="desc">Dependencies array — triggers auto-execution when values change</td>
+            </tr>
+            <tr>
+              <td><code>optimisticPatch</code></td>
+              <td><code>T | ((args) =&gt; T)</code></td>
+              <td className="desc">Value to set immediately on execute, before real response</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     {/* API Reference */}
@@ -275,6 +314,23 @@ const App = () => (
               <td><code className="method">resetPatch</code></td>
               <td><code className="method">() =&gt; void</code></td>
               <td className="desc">Revert to last real server response</td>
+            </tr>
+          </tbody>
+        </table>
+        <table>
+          <tbody>
+            <tr className="api-group"><td colSpan={3}>Constants</td></tr>
+            <tr>
+              <td><code className="api-enum-name">UseRequestStatus</code></td>
+              <td colSpan={2}>
+                <code className="api-enum-import">import {'{'} UseRequestStatus {'}'} from 'use-request'</code>
+                <div className="api-enum-values">
+                  <span><code>UseRequestStatus.Idle</code></span>
+                  <span><code>UseRequestStatus.Pending</code></span>
+                  <span><code>UseRequestStatus.Completed</code></span>
+                  <span><code>UseRequestStatus.Failed</code></span>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>

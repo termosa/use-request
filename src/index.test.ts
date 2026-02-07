@@ -841,13 +841,13 @@ describe('reset() with patches', () => {
   })
 })
 
-// autoPatch option tests
-describe('autoPatch option', () => {
-  it('applies autoPatch value immediately on execute', async () => {
+// optimisticPatch option tests
+describe('optimisticPatch option', () => {
+  it('applies optimisticPatch value immediately on execute', async () => {
     const { result, waitForNextUpdate } = renderHook(() =>
       useRequest(
         () => heavyTask(oneTime, 'real'),
-        { autoPatch: 'optimistic' }
+        { optimisticPatch: 'optimistic' }
       )
     )
 
@@ -867,11 +867,11 @@ describe('autoPatch option', () => {
     expectStatus(UseRequestStatus.Completed, result.current)
   })
 
-  it('applies autoPatch function with args', async () => {
+  it('applies optimisticPatch function with args', async () => {
     const { result, waitForNextUpdate } = renderHook(() =>
       useRequest(
         (id: number) => heavyTask(oneTime, `item-${id}`),
-        { autoPatch: (args) => `loading-${args[0]}` }
+        { optimisticPatch: (args) => `loading-${args[0]}` }
       )
     )
 
@@ -893,7 +893,7 @@ describe('autoPatch option', () => {
     const { result, waitForNextUpdate } = renderHook(() =>
       useRequest(
         () => Promise.reject('error'),
-        { autoPatch: 'optimistic' }
+        { optimisticPatch: 'optimistic' }
       )
     )
 
@@ -912,11 +912,11 @@ describe('autoPatch option', () => {
     expectStatus(UseRequestStatus.Failed, result.current)
   })
 
-  it('can resetPatch after autoPatch failure', async () => {
+  it('can resetPatch after optimisticPatch failure', async () => {
     const { result, waitForNextUpdate } = renderHook(() =>
       useRequest(
         () => Promise.reject('error'),
-        { autoPatch: 'optimistic' }
+        { optimisticPatch: 'optimistic' }
       )
     )
 
@@ -941,7 +941,7 @@ describe('autoPatch option', () => {
     const { result, waitForNextUpdate } = renderHook(() =>
       useRequest(
         (id: number) => heavyTask(oneTime, `item-${id}`),
-        { deps: [1], autoPatch: (args) => `loading-${args[0]}` }
+        { deps: [1], optimisticPatch: (args) => `loading-${args[0]}` }
       )
     )
 

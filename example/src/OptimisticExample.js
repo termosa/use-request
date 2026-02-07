@@ -7,7 +7,7 @@ const OptimisticExample = () => {
 
   const { value, pending, execute } = useRequest(
     (liked) => api.toggleLike(liked),
-    { autoPatch: ([liked]) => {
+    { optimisticPatch: ([liked]) => {
       const count = value?.count ?? status?.count ?? 0
       return { liked, count: count + (liked ? 1 : -1) }
     } }

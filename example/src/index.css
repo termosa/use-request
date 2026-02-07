@@ -696,6 +696,47 @@ body::after {
   color: var(--text-dim);
 }
 
+.api-enum-name {
+  color: var(--purple) !important;
+  background: rgba(149, 128, 255, 0.1) !important;
+}
+
+.api-enum-import {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  background: none;
+  padding: 0;
+  margin-bottom: 10px;
+}
+
+.api-enum-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+.api-enum-values > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.api-enum-values code {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--purple);
+  background: rgba(149, 128, 255, 0.1);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.api-enum-values .desc {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+}
+
 /* ─── Footer ─── */
 
 .footer {

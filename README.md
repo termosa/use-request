@@ -125,7 +125,7 @@ Instead of passing an array as the second argument, you can pass an options obje
 ```tsx
 const request = useRequest(callback, {
   deps: [userId],  // Dependencies array (triggers immediate execution)
-  autoPatch: (args) => expectedValue,  // Optimistic update value
+  optimisticPatch: (args) => expectedValue,  // Optimistic update value
 })
 ```
 
@@ -185,7 +185,7 @@ request.patched  // false | 'manual' | 'auto'
 
 // false   - real data from request
 // 'manual' - set via patch() or patchValue()
-// 'auto'   - set via autoPatch option
+// 'auto'   - set via optimisticPatch option
 ```
 
 Example usage:
@@ -194,7 +194,7 @@ Example usage:
 {request.patched && <span className="saving">Saving...</span>}
 ```
 
-## Optimistic Updates with `autoPatch`
+## Optimistic Updates with `optimisticPatch`
 
 Set a value immediately when `execute()` is called, before the request completes:
 
@@ -203,7 +203,7 @@ const useLike = (postId) => {
   const request = useRequest(
     (id, liked) => api.setLike(id, liked),
     {
-      autoPatch: (args) => ({ liked: args[1] })  // args = [postId, liked]
+      optimisticPatch: (args) => ({ liked: args[1] })  // args = [postId, liked]
     }
   )
 
@@ -221,7 +221,7 @@ const { value, execute, patched } = useLike(postId)
 
 ### Behavior on failure
 
-When a request fails with `autoPatch`:
+When a request fails with `optimisticPatch`:
 - The patched value is **kept** (not rolled back)
 - The error is set
 - `patched` remains `'auto'`
@@ -358,7 +358,7 @@ const useTodos = () => {
 | Property | Type | Description |
 |----------|------|-------------|
 | `deps` | `T[] \| null` | Dependencies array (triggers immediate execution when set) |
-| `autoPatch` | `T \| ((args) => T)` | Value to set immediately on execute |
+| `optimisticPatch` | `T \| ((args) => T)` | Value to set immediately on execute |
 
 ### Returned object
 
