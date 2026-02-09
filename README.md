@@ -124,8 +124,8 @@ Instead of passing an array as the second argument, you can pass an options obje
 
 ```tsx
 const request = useRequest(callback, {
-  deps: [userId],  // Dependencies array (triggers immediate execution)
-  optimisticPatch: (args) => expectedValue,  // Optimistic update value
+  deps: [userId], // Dependencies array (triggers immediate execution)
+  optimisticValue: (value, ...args) => expectedValue, // Optimistic update value
 })
 ```
 
@@ -173,7 +173,7 @@ const request = useRequest(fetchItems, [])
 
 request.patchValue([...items, optimisticItem])
 // If something goes wrong:
-request.resetPatch()  // Restores to last server response
+request.resetPatch() // Restores to last server response
 ```
 
 ### `patched` property
@@ -181,20 +181,22 @@ request.resetPatch()  // Restores to last server response
 Track whether the current state is from a patch:
 
 ```tsx
-request.patched  // false | 'manual' | 'auto'
+request.patched // false | 'manual' | 'auto'
 
 // false   - real data from request
 // 'manual' - set via patch() or patchValue()
-// 'auto'   - set via optimisticPatch option
+// 'auto'   - set via optimisticValue option
 ```
 
 Example usage:
 
 ```tsx
-{request.patched && <span className="saving">Saving...</span>}
+{
+  request.patched && <span className="saving">Saving...</span>
+}
 ```
 
-## Optimistic Updates with `optimisticPatch`
+## Optimistic Updates with `optimisticValue`
 
 Set a value immediately when `execute()` is called, before the request completes:
 
@@ -203,7 +205,7 @@ const useLike = (postId) => {
   const request = useRequest(
     (id, liked) => api.setLike(id, liked),
     {
-      optimisticPatch: (args) => ({ liked: args[1] })  // args = [postId, liked]
+      optimisticValue: (value, id, liked) => ({ liked })  // receives current value + spread args
     }
   )
 
@@ -221,7 +223,8 @@ const { value, execute, patched } = useLike(postId)
 
 ### Behavior on failure
 
-When a request fails with `optimisticPatch`:
+When a request fails with `optimisticValue`:
+
 - The patched value is **kept** (not rolled back)
 - The error is set
 - `patched` remains `'auto'`
@@ -231,9 +234,19 @@ Use `resetPatch()` to manually revert if needed:
 ```tsx
 if (request.failed && request.patched) {
   // Show error with option to revert
-  <button onClick={request.resetPatch}>Undo</button>
+  return <button onClick={request.resetPatch}>Undo</button>
 }
 ```
+
+### When the callback throws
+
+If the `optimisticValue` callback itself throws, the error is caught and:
+- The current value is **kept unchanged**
+- The error is set on the request
+- Status becomes `pending` (the request still fires)
+- `patched` is **not** set (no patch was applied)
+
+The request continues normally and will overwrite the error on success.
 
 ## More Examples
 
@@ -323,20 +336,17 @@ const MultipleFunctionsExample = () => {
 
 ```tsx
 const useTodos = () => {
-  const { value: todos, execute: refresh, patchValue, resetPatch } = useRequest(
-    () => api.getTodos(),
-    []
-  )
+  const { value: todos, execute: refresh, patchValue, resetPatch } = useRequest(() => api.getTodos(), [])
 
   const addTodo = async (text) => {
     const optimisticTodo = { id: Date.now(), text, completed: false }
     patchValue((current) => [...(current || []), optimisticTodo])
-    
+
     try {
       await api.addTodo(text)
-      refresh()  // Get real data from server
+      refresh() // Get real data from server
     } catch (e) {
-      resetPatch()  // Revert on error
+      resetPatch() // Revert on error
     }
   }
 
@@ -348,35 +358,35 @@ const useTodos = () => {
 
 ### `useRequest(callback, options?)`
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `callback` | `(...args) => Promise<T> \| T` | Async function to execute |
-| `options` | `T[] \| Options \| null` | Dependencies array or options object |
+| Parameter  | Type                           | Description                          |
+| ---------- | ------------------------------ | ------------------------------------ |
+| `callback` | `(...args) => Promise<T> \| T` | Async function to execute            |
+| `options`  | `T[] \| Options \| null`       | Dependencies array or options object |
 
 #### Options object
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `deps` | `T[] \| null` | Dependencies array (triggers immediate execution when set) |
-| `optimisticPatch` | `T \| ((args) => T)` | Value to set immediately on execute |
+| Property          | Type                    | Description                                                |
+| ----------------- | ----------------------- | ---------------------------------------------------------- |
+| `deps`            | `T[] \| null`           | Dependencies array (triggers immediate execution when set) |
+| `optimisticValue` | `(value, ...args) => T` | Value to set immediately on execute                        |
 
 ### Returned object
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `value` | `T \| undefined` | Last successful result |
-| `error` | `E \| undefined` | Last error |
-| `status` | `UseRequestStatus` | Current status enum |
-| `idle` | `boolean` | True when not yet executed |
-| `pending` | `boolean` | True while request is in flight |
-| `completed` | `boolean` | True after successful completion |
-| `failed` | `boolean` | True after error |
-| `patched` | `false \| 'manual' \| 'auto'` | Patch state indicator |
-| `execute` | `(...args) => Promise<T>` | Trigger the request |
-| `reset` | `() => void` | Reset to idle state |
-| `patch` | `(input) => void` | Update state manually |
-| `patchValue` | `(input) => void` | Update value only |
-| `resetPatch` | `() => void` | Restore last real state |
+| Property     | Type                          | Description                      |
+| ------------ | ----------------------------- | -------------------------------- |
+| `value`      | `T \| undefined`              | Last successful result           |
+| `error`      | `E \| undefined`              | Last error                       |
+| `status`     | `UseRequestStatus`            | Current status enum              |
+| `idle`       | `boolean`                     | True when not yet executed       |
+| `pending`    | `boolean`                     | True while request is in flight  |
+| `completed`  | `boolean`                     | True after successful completion |
+| `failed`     | `boolean`                     | True after error                 |
+| `patched`    | `false \| 'manual' \| 'auto'` | Patch state indicator            |
+| `execute`    | `(...args) => Promise<T>`     | Trigger the request              |
+| `reset`      | `() => void`                  | Reset to idle state              |
+| `patch`      | `(input) => void`             | Update state manually            |
+| `patchValue` | `(input) => void`             | Update value only                |
+| `resetPatch` | `() => void`                  | Restore last real state          |
 
 ## License
 

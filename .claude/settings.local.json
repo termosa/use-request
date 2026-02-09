@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx react-scripts build:*)"
+      "Bash(npx react-scripts build:*)",
+      "Bash(npm test:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git stash:*)",
+      "Bash(EC=$?)",
+      "Bash(exit:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(git restore:*)",
+      "Bash(git commit:*)",
+      "Bash(gitshot)"
     ]
   }
 }

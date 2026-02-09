@@ -55,9 +55,9 @@ failed   <span class="cm">// rejected</span>
 const optimisticCode = `<span class="kw">const</span> { value, execute } = <span class="fn">useRequest</span>(
   (liked) <span class="op">=></span> api.<span class="fn">toggleLike</span>(liked),
   {
-    <span class="prop">optimisticPatch</span>: ([liked]) <span class="op">=></span> ({
+    <span class="prop">optimisticValue</span>: (value, liked) <span class="op">=></span> ({
       liked,
-      count: prev.<span class="prop">count</span> + (liked ? <span class="num">1</span> : <span class="num">-1</span>)
+      count: (value?.<span class="prop">count</span> ?? <span class="num">0</span>) + (liked ? <span class="num">1</span> : <span class="num">-1</span>)
     })
   }
 )
@@ -163,7 +163,7 @@ const App = () => (
       <div className="feature-card">
         <div className="icon">++</div>
         <h3>Optimistic Updates</h3>
-        <p>Instant UI feedback with optimisticPatch. Rolls back automatically on failure.</p>
+        <p>Instant UI feedback with optimisticValue. Rolls back automatically on failure.</p>
       </div>
     </div>
 
@@ -226,8 +226,8 @@ const App = () => (
               <td className="desc">Dependencies array — triggers auto-execution when values change</td>
             </tr>
             <tr>
-              <td><code>optimisticPatch</code></td>
-              <td><code>T | ((args) =&gt; T)</code></td>
+              <td><code>optimisticValue</code></td>
+              <td><code>(value, ...args) =&gt; T</code></td>
               <td className="desc">Value to set immediately on execute, before real response</td>
             </tr>
           </tbody>

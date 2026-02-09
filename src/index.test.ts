@@ -13,15 +13,18 @@ const asyncDivision = (a: number, b: number) =>
     else reject('Cannot divide by zero')
   })
 
-const heavyTask = (ms: number, value: unknown) =>
-  new Promise((resolve, reject) => setTimeout(() => Promise.resolve(value).then(resolve, reject), ms))
+const heavyTask = <T,>(ms: number, value: T): Promise<Awaited<T>> =>
+  new Promise<Awaited<T>>((resolve, reject) => setTimeout(() => Promise.resolve(value).then(resolve, reject), ms))
 
 const skip = (ms: number) =>
   act(() => {
     jest.advanceTimersByTime(ms)
   })
 
-const expectStatus = (status: UseRequestStatus, request: { status: UseRequestStatus; idle: boolean; pending: boolean; completed: boolean; failed: boolean }) => {
+const expectStatus = (
+  status: UseRequestStatus,
+  request: { status: UseRequestStatus; idle: boolean; pending: boolean; completed: boolean; failed: boolean }
+) => {
   expect(request.status).toBe(status)
   expect([request.idle, request.pending, request.completed, request.failed]).toEqual([
     request.status === UseRequestStatus.Idle,
@@ -438,7 +441,7 @@ it('rejects with an error that was thrown directly in the callback', async () =>
   await waitForNextUpdate()
 
   expectStatus(UseRequestStatus.Failed, result.current)
-  expect(result.current.value).toBeUndefined
+  expect(result.current.value).toBeUndefined()
   expect(result.current.error).toBe('error')
 })
 
@@ -843,14 +846,11 @@ describe('reset() with patches', () => {
   })
 })
 
-// optimisticPatch option tests
-describe('optimisticPatch option', () => {
-  it('applies optimisticPatch value immediately on execute', async () => {
+// optimisticValue option tests
+describe('optimisticValue option', () => {
+  it('applies optimisticValue value immediately on execute', async () => {
     const { result, waitForNextUpdate } = renderHook(() =>
-      useRequest(
-        () => heavyTask(oneTime, 'real'),
-        { optimisticPatch: 'optimistic' }
-      )
+      useRequest(() => heavyTask(oneTime, 'real'), { optimisticValue: () => 'optimistic' })
     )
 
     act(() => {
@@ -869,12 +869,11 @@ describe('optimisticPatch option', () => {
     expectStatus(UseRequestStatus.Completed, result.current)
   })
 
-  it('applies optimisticPatch function with args', async () => {
+  it('applies optimisticValue function with args', async () => {
     const { result, waitForNextUpdate } = renderHook(() =>
-      useRequest(
-        (id: number) => heavyTask(oneTime, `item-${id}`),
-        { optimisticPatch: (args) => `loading-${args[0]}` }
-      )
+      useRequest<string, unknown, [number]>((id) => heavyTask(oneTime, `item-${id}`), {
+        optimisticValue: (_value, id) => `loading-${id}`,
+      })
     )
 
     act(() => {
@@ -893,10 +892,7 @@ describe('optimisticPatch option', () => {
 
   it('keeps patched value on failure', async () => {
     const { result, waitForNextUpdate } = renderHook(() =>
-      useRequest(
-        () => Promise.reject('error'),
-        { optimisticPatch: 'optimistic' }
-      )
+      useRequest(() => Promise.reject('error'), { optimisticValue: () => 'optimistic' })
     )
 
     act(() => {
@@ -914,12 +910,9 @@ describe('optimisticPatch option', () => {
     expectStatus(UseRequestStatus.Failed, result.current)
   })
 
-  it('can resetPatch after optimisticPatch failure', async () => {
+  it('can resetPatch after optimisticValue failure', async () => {
     const { result, waitForNextUpdate } = renderHook(() =>
-      useRequest(
-        () => Promise.reject('error'),
-        { optimisticPatch: 'optimistic' }
-      )
+      useRequest(() => Promise.reject('error'), { optimisticValue: () => 'optimistic' })
     )
 
     act(() => {
@@ -941,10 +934,10 @@ describe('optimisticPatch option', () => {
 
   it('works with deps option', async () => {
     const { result, waitForNextUpdate } = renderHook(() =>
-      useRequest(
-        (id: number) => heavyTask(oneTime, `item-${id}`),
-        { deps: [1], optimisticPatch: (args) => `loading-${args[0]}` }
-      )
+      useRequest((id: number) => heavyTask(oneTime, `item-${id}`), {
+        deps: [1],
+        optimisticValue: (_value, id) => `loading-${id}`,
+      })
     )
 
     expect(result.current.value).toBe('loading-1')
@@ -955,6 +948,80 @@ describe('optimisticPatch option', () => {
 
     expect(result.current.value).toBe('item-1')
     expect(result.current.patched).toBe(false)
+  })
+
+  it('receives current value as first argument', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest((n: number) => heavyTask(oneTime, n), {
+        optimisticValue: (value: number | undefined, n: number) => (value ?? 0) + n,
+      })
+    )
+
+    act(() => {
+      result.current.execute(5)
+    })
+
+    expect(result.current.value).toBe(5)
+
+    skip(oneTime)
+    await waitForNextUpdate()
+
+    // Real value resolves
+    expect(result.current.value).toBe(5)
+
+    // Execute again — optimisticValue should see the real value (5)
+    act(() => {
+      result.current.execute(3)
+    })
+
+    expect(result.current.value).toBe(8)
+
+    skip(oneTime)
+    await waitForNextUpdate()
+  })
+
+  it('receives spread args (not array)', async () => {
+    const patchFn = jest.fn((_value: string | undefined, a: number, b: string) => `${b}-${a}`)
+
+    const { result } = renderHook(() =>
+      useRequest((a: number, b: string) => heavyTask(oneTime, `${b}-${a}`), {
+        optimisticValue: patchFn,
+      })
+    )
+
+    act(() => {
+      result.current.execute(42, 'hello')
+    })
+
+    expect(patchFn).toHaveBeenCalledWith(undefined, 42, 'hello')
+    expect(result.current.value).toBe('hello-42')
+  })
+
+  it('when callback throws, value unchanged, error set, request still fires', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest(() => heavyTask(oneTime, 'real'), {
+        optimisticValue: () => {
+          throw new Error('patch failed')
+        },
+      })
+    )
+
+    act(() => {
+      result.current.execute()
+    })
+
+    // Value unchanged (undefined), error set, status pending (request still in flight)
+    expect(result.current.value).toBeUndefined()
+    expect(result.current.error).toEqual(new Error('patch failed'))
+    expectStatus(UseRequestStatus.Pending, result.current)
+
+    skip(oneTime)
+    await waitForNextUpdate()
+
+    // Request still completed successfully
+    expect(result.current.value).toBe('real')
+    expect(result.current.patched).toBe(false)
+    expectStatus(UseRequestStatus.Completed, result.current)
   })
 })
 

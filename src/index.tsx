@@ -7,11 +7,17 @@ export enum UseRequestStatus {
   Failed = 'failed',
 }
 
-export type PatchedState = false | 'manual' | 'auto'
+export const UseRequestPatched = {
+  No: false as const,
+  Manual: 'manual' as const,
+  Auto: 'auto' as const,
+}
+
+export type UseRequestPatchedState = (typeof UseRequestPatched)[keyof typeof UseRequestPatched]
 
 export interface UseRequestOptions<Value, Arguments extends unknown[]> {
   deps?: Arguments | null
-  optimisticPatch?: Value | ((args: Arguments) => Value)
+  optimisticValue?: (value: Value | undefined, ...args: Arguments) => Value
 }
 
 export function useRequest<Value, ErrorValue extends unknown = unknown, Arguments extends unknown[] = unknown[]>(
@@ -19,11 +25,10 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
   options?: Arguments | UseRequestOptions<Value, Arguments> | null
 ): Request<Value, ErrorValue, Arguments> {
   // Normalize options: array = legacy deps, object = new options
-  const opts: UseRequestOptions<Value, Arguments> = Array.isArray(options) || options === null
-    ? { deps: options }
-    : (options || {})
-  
-  const { deps, optimisticPatch } = opts
+  const opts: UseRequestOptions<Value, Arguments> =
+    Array.isArray(options) || options === null ? { deps: options } : options || {}
+
+  const { deps, optimisticValue } = opts
 
   const processesRef = React.useRef(0)
   const lastCompletedProcessRef = React.useRef(0)
@@ -32,8 +37,8 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
   const requestRef = React.useRef(request)
   requestRef.current = request
 
-  const optimisticPatchRef = React.useRef(optimisticPatch)
-  optimisticPatchRef.current = optimisticPatch
+  const optimisticValueRef = React.useRef(optimisticValue)
+  optimisticValueRef.current = optimisticValue
 
   // Real state from actual request (for resetPatch)
   const realStateRef = React.useRef<{ value?: Value; error?: ErrorValue }>({})
@@ -60,7 +65,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
     const real = realStateRef.current
     const hasValue = 'value' in real
     const hasError = 'error' in real
-    
+
     let status: UseRequestStatus
     if (!hasValue && !hasError) {
       status = UseRequestStatus.Idle
@@ -79,37 +84,41 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
     })
   }, [])
 
-  const patch = React.useCallback((
-    input: PatchInput<Value, ErrorValue> | ((current: { value?: Value; error?: ErrorValue }) => PatchInput<Value, ErrorValue>)
-  ) => {
-    const current = { value: stateRef.current.value, error: stateRef.current.error }
-    const newPatch = typeof input === 'function' ? input(current) : input
+  const patch = React.useCallback(
+    (
+      input:
+        | PatchInput<Value, ErrorValue>
+        | ((current: { value?: Value; error?: ErrorValue }) => PatchInput<Value, ErrorValue>)
+    ) => {
+      const current = { value: stateRef.current.value, error: stateRef.current.error }
+      const newPatch = typeof input === 'function' ? input(current) : input
 
-    let status: UseRequestStatus
-    if ('error' in newPatch && newPatch.error !== undefined) {
-      status = UseRequestStatus.Failed
-    } else if ('value' in newPatch && newPatch.value !== undefined) {
-      status = UseRequestStatus.Completed
-    } else {
-      status = UseRequestStatus.Idle
-    }
+      let status: UseRequestStatus
+      if ('error' in newPatch && newPatch.error !== undefined) {
+        status = UseRequestStatus.Failed
+      } else if ('value' in newPatch && newPatch.value !== undefined) {
+        status = UseRequestStatus.Completed
+      } else {
+        status = UseRequestStatus.Idle
+      }
 
-    // Invalidate any pending requests so they can't override this patch
-    lastCompletedProcessRef.current = processesRef.current
-    patchedAtProcessRef.current = processesRef.current + 1
-    update({
-      status,
-      value: newPatch.value,
-      error: newPatch.error,
-      patched: 'manual',
-    })
-  }, [])
+      // Invalidate any pending requests so they can't override this patch
+      lastCompletedProcessRef.current = processesRef.current
+      patchedAtProcessRef.current = processesRef.current + 1
+      update({
+        status,
+        value: newPatch.value,
+        error: newPatch.error,
+        patched: 'manual',
+      })
+    },
+    []
+  )
 
-  const patchValue = React.useCallback((
-    input: Value | ((current: Value | undefined) => Value)
-  ) => {
+  const patchValue = React.useCallback((input: Value | ((current: Value | undefined) => Value)) => {
     const currentValue = stateRef.current.value
-    const newValue = typeof input === 'function' ? (input as (current: Value | undefined) => Value)(currentValue) : input
+    const newValue =
+      typeof input === 'function' ? (input as (current: Value | undefined) => Value)(currentValue) : input
 
     // Invalidate any pending requests so they can't override this patch
     lastCompletedProcessRef.current = processesRef.current
@@ -125,20 +134,26 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
   const execute = React.useCallback((...args: Arguments) => {
     const processIndex = ++processesRef.current
 
-    // Apply optimisticPatch if configured
-    const optimisticPatchValue = optimisticPatchRef.current
-    if (optimisticPatchValue !== undefined) {
-      const patchedValue = typeof optimisticPatchValue === 'function'
-        ? (optimisticPatchValue as (args: Arguments) => Value)(args)
-        : optimisticPatchValue
+    // Apply optimisticValue if configured
+    const optimisticValueValue = optimisticValueRef.current
+    if (optimisticValueValue) {
+      try {
+        const patchedValue = optimisticValueValue(stateRef.current.value, ...args)
 
-      patchedAtProcessRef.current = processIndex
-      update({
-        status: UseRequestStatus.Pending,
-        value: patchedValue,
-        error: undefined,
-        patched: 'auto',
-      })
+        patchedAtProcessRef.current = processIndex
+        update({
+          status: UseRequestStatus.Pending,
+          value: patchedValue,
+          error: undefined,
+          patched: 'auto',
+        })
+      } catch (error) {
+        update({
+          ...stateRef.current,
+          status: UseRequestStatus.Pending,
+          error: error as ErrorValue,
+        })
+      }
     } else {
       update({
         ...stateRef.current,
@@ -146,7 +161,9 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
       })
     }
 
-    const promise = new Promise<Value>((resolve) => resolve(requestRef.current(...(args as any))))
+    const promise = new Promise<Value>((resolve) =>
+      resolve(requestRef.current(...(args as unknown as [...Arguments, ...any[]])))
+    )
     promise.then(
       (response: Value) => {
         if (processIndex > lastCompletedProcessRef.current) {
@@ -225,7 +242,7 @@ interface InternalState<Value, ErrorValue> {
   status: UseRequestStatus
   value?: Value | undefined
   error?: ErrorValue | undefined
-  patched: PatchedState
+  patched: UseRequestPatchedState
 }
 
 export interface State<Value = unknown, ErrorValue = unknown> {
@@ -239,19 +256,20 @@ export interface PatchInput<Value, ErrorValue> {
   error?: ErrorValue
 }
 
-export interface Request<
-  Value = unknown,
-  ErrorValue = unknown,
-  Args extends unknown[] = unknown[]
-> extends State<Value, ErrorValue> {
+export interface Request<Value = unknown, ErrorValue = unknown, Args extends unknown[] = unknown[]>
+  extends State<Value, ErrorValue> {
   idle: boolean
   pending: boolean
   completed: boolean
   failed: boolean
-  patched: PatchedState
+  patched: UseRequestPatchedState
   reset: () => void
   resetPatch: () => void
-  patch: (input: PatchInput<Value, ErrorValue> | ((current: { value?: Value; error?: ErrorValue }) => PatchInput<Value, ErrorValue>)) => void
+  patch: (
+    input:
+      | PatchInput<Value, ErrorValue>
+      | ((current: { value?: Value; error?: ErrorValue }) => PatchInput<Value, ErrorValue>)
+  ) => void
   patchValue: (input: Value | ((current: Value | undefined) => Value)) => void
   execute: (...args: Args) => Promise<Value>
 }

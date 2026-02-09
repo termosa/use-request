@@ -5,13 +5,12 @@ import api from './api'
 const OptimisticExample = () => {
   const { value: status } = useRequest(api.getLikeStatus, [])
 
-  const { value, pending, execute } = useRequest(
-    (liked) => api.toggleLike(liked),
-    { optimisticPatch: ([liked]) => {
-      const count = value?.count ?? status?.count ?? 0
+  const { value, pending, execute } = useRequest((liked) => api.toggleLike(liked), {
+    optimisticValue: (current, liked) => {
+      const count = current?.count ?? status?.count ?? 0
       return { liked, count: count + (liked ? 1 : -1) }
-    } }
-  )
+    },
+  })
 
   const current = value || status
   const liked = current?.liked || false
@@ -19,10 +18,7 @@ const OptimisticExample = () => {
 
   return (
     <div>
-      <button
-        className={`like-btn${liked ? ' liked' : ''}`}
-        onClick={() => execute(!liked)}
-      >
+      <button className={`like-btn${liked ? ' liked' : ''}`} onClick={() => execute(!liked)}>
         <span className="heart">{liked ? '\u2764\uFE0F' : '\uD83E\uDD0D'}</span>
         <span>{count}</span>
       </button>
