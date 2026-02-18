@@ -5,6 +5,7 @@ import ErrorExample from './ErrorExample'
 import OptimisticExample from './OptimisticExample'
 import PatchExample from './PatchExample'
 import RaceExample from './RaceExample'
+import InfiniteLoadExample from './InfiniteLoadExample'
 import pkg from 'use-request/package.json'
 
 const Example = ({ title, code, badge, children }) => (
@@ -85,6 +86,20 @@ const raceCode = `<span class="kw">const</span> [query, setQuery] = <span class=
   (q) <span class="op">=></span> q ? api.<span class="fn">search</span>(q) : [],
   [query]
 )`
+
+const infiniteLoadCode = `<span class="kw">const</span> [page, setPage] = <span class="fn">useState</span>(<span class="num">0</span>)
+
+<span class="kw">const</span> { value: items, pending } = <span class="fn">useRequest</span>(
+  api.<span class="prop">getPage</span>,
+  {
+    <span class="prop">deps</span>: [page],
+    <span class="prop">reduce</span>: (all, page) <span class="op">=></span>
+      [...(all || []), ...page],
+  }
+)
+
+<span class="cm">// each response is folded into the previous</span>
+<span class="fn">setPage</span>(p <span class="op">=></span> p + <span class="num">1</span>)`
 
 const pkgManagers = [
   { id: 'npm', cmd: 'npm install use-request' },
@@ -194,6 +209,10 @@ const App = () => (
       <Example title="Race-safe search" code={raceCode}>
         <RaceExample />
       </Example>
+
+      <Example title="Infinite loading" code={infiniteLoadCode} badge="reduce">
+        <InfiniteLoadExample />
+      </Example>
     </div>
 
     {/* Arguments */}
@@ -229,6 +248,11 @@ const App = () => (
               <td><code>optimisticValue</code></td>
               <td><code>(value, ...args) =&gt; T</code></td>
               <td className="desc">Value to set immediately on execute, before real response</td>
+            </tr>
+            <tr>
+              <td><code>reduce</code></td>
+              <td><code>(accumulated, response) =&gt; T</code></td>
+              <td className="desc">Fold each response into accumulated value</td>
             </tr>
           </tbody>
         </table>

@@ -18,8 +18,17 @@ export type UseRequestPatchedState = (typeof UseRequestPatched)[keyof typeof Use
 export interface UseRequestOptions<Value, Arguments extends unknown[]> {
   deps?: Arguments | null
   optimisticValue?: (value: Value | undefined, ...args: Arguments) => Value
+  reduce?: (accumulated: Value | undefined, response: Value) => Value
 }
 
+export function useRequest<Value, ErrorValue extends unknown = unknown, Arguments extends unknown[] = unknown[]>(
+  request: (...args: [...Arguments, ...any[]]) => Promise<Value> | Value,
+  deps: Arguments | null
+): Request<Value, ErrorValue, Arguments>
+export function useRequest<Value, ErrorValue extends unknown = unknown, Arguments extends unknown[] = unknown[]>(
+  request: (...args: [...Arguments, ...any[]]) => Promise<Value> | Value,
+  options?: UseRequestOptions<Value, Arguments>
+): Request<Value, ErrorValue, Arguments>
 export function useRequest<Value, ErrorValue extends unknown = unknown, Arguments extends unknown[] = unknown[]>(
   request: (...args: [...Arguments, ...any[]]) => Promise<Value> | Value,
   options?: Arguments | UseRequestOptions<Value, Arguments> | null
@@ -28,7 +37,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
   const opts: UseRequestOptions<Value, Arguments> =
     Array.isArray(options) || options === null ? { deps: options } : options || {}
 
-  const { deps, optimisticValue } = opts
+  const { deps, optimisticValue, reduce } = opts
 
   const processesRef = React.useRef(0)
   const lastCompletedProcessRef = React.useRef(0)
@@ -39,6 +48,9 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
 
   const optimisticValueRef = React.useRef(optimisticValue)
   optimisticValueRef.current = optimisticValue
+
+  const reduceRef = React.useRef(reduce)
+  reduceRef.current = reduce
 
   // Real state from actual request (for resetPatch)
   const realStateRef = React.useRef<{ value?: Value; error?: ErrorValue }>({})
@@ -173,10 +185,13 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
             return
           }
           lastCompletedProcessRef.current = processIndex
-          realStateRef.current = { value: response }
+          const finalValue = reduceRef.current
+            ? reduceRef.current(realStateRef.current.value, response)
+            : response
+          realStateRef.current = { value: finalValue }
           update({
             status: processIndex === processesRef.current ? UseRequestStatus.Completed : stateRef.current.status,
-            value: response,
+            value: finalValue,
             error: undefined,
             patched: false,
           })
@@ -192,7 +207,8 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
           lastCompletedProcessRef.current = processIndex
           realStateRef.current = { ...realStateRef.current, error }
           // Keep patched value on error, but clear value if not patched (original behavior)
-          const keepValue = stateRef.current.patched !== false
+          // Also keep accumulated value when reduce is configured
+          const keepValue = stateRef.current.patched !== false || !!reduceRef.current
           update({
             status: processIndex === processesRef.current ? UseRequestStatus.Failed : stateRef.current.status,
             value: keepValue ? stateRef.current.value : undefined,

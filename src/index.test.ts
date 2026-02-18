@@ -1182,3 +1182,233 @@ describe('stale request handling', () => {
     expect(result.current.value).toBe('new')
   })
 })
+
+// reduce option tests
+describe('reduce option', () => {
+  it('accumulates values across multiple executes', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest((items: number[]) => Promise.resolve(items), {
+        reduce: (acc, items) => [...(acc || []), ...items],
+      })
+    )
+
+    act(() => {
+      result.current.execute([1, 2])
+    })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toEqual([1, 2])
+
+    act(() => {
+      result.current.execute([3, 4])
+    })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toEqual([1, 2, 3, 4])
+  })
+
+  it('passes undefined as accumulated on first call', async () => {
+    const reduceFn = jest.fn((acc: number | undefined, val: number) => (acc ?? 0) + val)
+
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest((n: number) => Promise.resolve(n), { reduce: reduceFn })
+    )
+
+    act(() => {
+      result.current.execute(5)
+    })
+
+    await waitForNextUpdate()
+
+    expect(reduceFn).toHaveBeenCalledWith(undefined, 5)
+    expect(result.current.value).toBe(5)
+  })
+
+  it('reset clears accumulated state', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest((n: number) => Promise.resolve(n), {
+        reduce: (acc, val) => (acc ?? 0) + val,
+      })
+    )
+
+    act(() => {
+      result.current.execute(5)
+    })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe(5)
+
+    act(() => {
+      result.current.execute(3)
+    })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe(8)
+
+    act(() => {
+      result.current.reset()
+    })
+
+    expect(result.current.value).toBeUndefined()
+
+    act(() => {
+      result.current.execute(10)
+    })
+
+    await waitForNextUpdate()
+
+    // Should start fresh, not accumulate from 8
+    expect(result.current.value).toBe(10)
+  })
+
+  it('preserves accumulated value on error', async () => {
+    let shouldFail = false
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest(
+        (n: number) => (shouldFail ? Promise.reject('error') : Promise.resolve(n)),
+        { reduce: (acc, val) => (acc ?? 0) + val }
+      )
+    )
+
+    act(() => {
+      result.current.execute(5)
+    })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe(5)
+
+    shouldFail = true
+
+    act(() => {
+      result.current.execute(3)
+    })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe(5)
+    expect(result.current.error).toBe('error')
+    expectStatus(UseRequestStatus.Failed, result.current)
+  })
+
+  it('works with deps (auto-execution accumulates)', async () => {
+    const { result, waitForNextUpdate, rerender } = renderHook(
+      ({ page }) =>
+        useRequest((p: number) => Promise.resolve([p]), {
+          deps: [page],
+          reduce: (acc, items) => [...(acc || []), ...items],
+        }),
+      { initialProps: { page: 1 } }
+    )
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toEqual([1])
+
+    rerender({ page: 2 })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toEqual([1, 2])
+  })
+
+  it('latest request wins in race condition (stale dropped)', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest(heavyTask, {
+        reduce: (acc: string | undefined, val: string) => (acc ? `${acc},${val}` : val),
+      })
+    )
+
+    // Start slow request, then fast request
+    act(() => {
+      result.current.execute(2 * oneTime, 'slow')
+      result.current.execute(oneTime, 'fast')
+    })
+
+    skip(oneTime)
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe('fast')
+
+    // Slow request resolves but is stale — should be dropped
+    skip(oneTime)
+
+    expect(result.current.value).toBe('fast')
+  })
+
+  it('patchValue is temporary — next reduce uses real state', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest((items: number[]) => Promise.resolve(items), {
+        reduce: (acc, items) => [...(acc || []), ...items],
+      })
+    )
+
+    act(() => {
+      result.current.execute([1, 2])
+    })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toEqual([1, 2])
+
+    // Patch with temporary value
+    act(() => {
+      result.current.patchValue([1, 2, 99])
+    })
+
+    expect(result.current.value).toEqual([1, 2, 99])
+    expect(result.current.patched).toBe('manual')
+
+    // New request — reduce should fold into real state [1,2], not patched [1,2,99]
+    act(() => {
+      result.current.execute([3, 4])
+    })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toEqual([1, 2, 3, 4])
+    expect(result.current.patched).toBe(false)
+  })
+
+  it('works with optimisticValue — completion reduces into real state', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest<number[], unknown, [number[]]>((items) => heavyTask(oneTime, items), {
+        reduce: (acc, items) => [...(acc || []), ...items],
+        optimisticValue: (current, items) => [...(current || []), ...items.map((i: number) => -i)],
+      })
+    )
+
+    act(() => {
+      result.current.execute([1, 2])
+    })
+
+    // Optimistic value applied immediately
+    expect(result.current.value).toEqual([-1, -2])
+    expect(result.current.patched).toBe('auto')
+
+    skip(oneTime)
+    await waitForNextUpdate()
+
+    // Real value reduced into real state (which was undefined)
+    expect(result.current.value).toEqual([1, 2])
+    expect(result.current.patched).toBe(false)
+
+    // Second execute
+    act(() => {
+      result.current.execute([3])
+    })
+
+    // Optimistic: current value [1,2] + optimistic [-3]
+    expect(result.current.value).toEqual([1, 2, -3])
+
+    skip(oneTime)
+    await waitForNextUpdate()
+
+    // Real: reduce([1,2], [3]) = [1,2,3]
+    expect(result.current.value).toEqual([1, 2, 3])
+  })
+})

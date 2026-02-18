@@ -10,7 +10,8 @@
       "Bash(npm run typecheck:*)",
       "Bash(git restore:*)",
       "Bash(git commit:*)",
-      "Bash(gitshot)"
+      "Bash(gitshot)",
+      "Bash(npm run build:*)"
     ]
   }
 }

@@ -196,6 +196,41 @@ Example usage:
 }
 ```
 
+## Accumulating Results with `reduce`
+
+Fold each new response into the previous value — useful for infinite scroll, polling accumulation, etc:
+
+```tsx
+const useInfiniteItems = () => {
+  const [page, setPage] = useState(0)
+  const { value: items, pending } = useRequest(
+    (p: number) => api.getItems(p),
+    {
+      deps: [page],
+      reduce: (all, pageItems) => [...(all || []), ...pageItems],
+    }
+  )
+
+  const pendingRef = useRef(pending)
+  pendingRef.current = pending
+
+  const loadMore = useCallback(() => {
+    if (pendingRef.current) return
+    setPage((page) => page + 1)
+  }, [])
+
+  return { items, loadMore, pending }
+}
+```
+
+### How it works
+
+- On each successful response, `reduce(previousValue, response)` is called to compute the new value
+- First call receives `undefined` as `previousValue`
+- `reset()` clears accumulated state — next reduce starts fresh
+- On error, accumulated value is preserved (won't lose pages 1-5 when page 6 fails)
+- Patches (`patchValue`) remain temporary — next reduce folds into the real (non-patched) state
+
 ## Optimistic Updates with `optimisticValue`
 
 Set a value immediately when `execute()` is called, before the request completes:
@@ -369,6 +404,7 @@ const useTodos = () => {
 | ----------------- | ----------------------- | ---------------------------------------------------------- |
 | `deps`            | `T[] \| null`           | Dependencies array (triggers immediate execution when set) |
 | `optimisticValue` | `(value, ...args) => T` | Value to set immediately on execute                        |
+| `reduce`          | `(accumulated, response) => T` | Fold each response into accumulated value            |
 
 ### Returned object
 

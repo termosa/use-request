@@ -68,6 +68,14 @@ const api = {
       () => data.fruits.filter((f) => f.toLowerCase().includes(query.toLowerCase())),
       200 + Math.random() * 1300
     ),
+  getPage: (page) => {
+    const pageSize = 5
+    const start = page * pageSize
+    return simulateRequest(
+      () => data.fruits.slice(start, start + pageSize),
+      300 + Math.random() * 500
+    )
+  },
 }
 
 export default api
