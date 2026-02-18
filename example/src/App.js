@@ -8,23 +8,84 @@ import RaceExample from './RaceExample'
 import InfiniteLoadExample from './InfiniteLoadExample'
 import pkg from 'use-request/package.json'
 
-const Example = ({ title, code, badge, children }) => (
-  <div className="example">
-    <div className="example-header">
-      <h3>{title}</h3>
-      {badge && <span className="badge">{badge}</span>}
+const toSlug = (title) =>
+  title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-$/, '')
+
+const useAnchor = (id) => {
+  const [highlighted, setHighlighted] = React.useState(false)
+
+  React.useEffect(() => {
+    if (window.location.hash === `#${id}`) {
+      setHighlighted(true)
+      scrollTo(document.getElementById(id))
+      setTimeout(() => setHighlighted(false), 2000)
+    }
+  }, [id])
+
+  const handleClick = (e) => {
+    e.preventDefault()
+    const url = `${window.location.origin}${window.location.pathname}#${id}`
+    window.history.replaceState(null, '', `#${id}`)
+    navigator.clipboard?.writeText(url)
+    scrollTo(document.getElementById(id))
+    setHighlighted(true)
+    setTimeout(() => setHighlighted(false), 2000)
+  }
+
+  return { highlighted, handleClick }
+}
+
+const scrollTo = (el) => {
+  const gap = 24
+  const fitsScreen = el.offsetHeight + gap * 2 < window.innerHeight
+  if (fitsScreen) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  } else {
+    const top = el.getBoundingClientRect().top + window.scrollY - gap
+    window.scrollTo({ top, behavior: 'smooth' })
+  }
+}
+
+const Section = ({ title, children }) => {
+  const id = toSlug(title)
+  const { highlighted, handleClick } = useAnchor(id)
+
+  return (
+    <div id={id} className={`section${highlighted ? ' highlighted' : ''}`}>
+      <h2 className="section-title">
+        <a href={`#${id}`} onClick={handleClick}>{title}</a>
+      </h2>
+      {children}
     </div>
-    <div className="example-body">
-      <div className="example-code">
-        <pre dangerouslySetInnerHTML={{ __html: code }} />
+  )
+}
+
+const Example = ({ title, code, badge, children }) => {
+  const id = toSlug(title)
+  const { highlighted, handleClick } = useAnchor(id)
+
+  return (
+    <div id={id} className={`example${highlighted ? ' highlighted' : ''}`}>
+      <div className="example-header">
+        <h3>
+          <a href={`#${id}`} onClick={handleClick}>
+            {title}
+          </a>
+        </h3>
+        {badge && <span className="badge">{badge}</span>}
       </div>
-      <div className="example-preview">
-        <div className="example-preview-label">Live preview</div>
-        {children}
+      <div className="example-body">
+        <div className="example-code">
+          <pre dangerouslySetInnerHTML={{ __html: code }} />
+        </div>
+        <div className="example-preview">
+          <div className="example-preview-label">Live preview</div>
+          {children}
+        </div>
       </div>
     </div>
-  </div>
-)
+  )
+}
 
 const basicCode = `<span class="kw">const</span> { value, pending, execute } = <span class="fn">useRequest</span>(
   (num) <span class="op">=></span> <span class="fn">wait</span>(<span class="num">2</span>).<span class="fn">then</span>(() <span class="op">=></span> num)
@@ -187,8 +248,7 @@ const App = () => (
     </div>
 
     {/* Examples */}
-    <div className="section">
-      <h2 className="section-title">In action</h2>
+    <Section title="In action">
 
       <Example title="Manual execution" code={basicCode}>
         <SingleFunctionExample />
@@ -214,14 +274,13 @@ const App = () => (
         <RaceExample />
       </Example>
 
-      <Example title="Infinite loading" code={infiniteLoadCode} badge="reduce">
+      <Example title="Infinite loading" code={infiniteLoadCode}>
         <InfiniteLoadExample />
       </Example>
-    </div>
+    </Section>
 
     {/* Arguments */}
-    <div className="section">
-      <h2 className="section-title">Arguments</h2>
+    <Section title="Arguments">
       <div className="api-ref">
         <table>
           <thead>
@@ -266,11 +325,10 @@ const App = () => (
           </tbody>
         </table>
       </div>
-    </div>
+    </Section>
 
     {/* API Reference */}
-    <div className="section">
-      <h2 className="section-title">Surface</h2>
+    <Section title="Surface">
       <div className="api-ref">
         <table>
           <thead>
@@ -369,7 +427,7 @@ const App = () => (
           </tbody>
         </table>
       </div>
-    </div>
+    </Section>
 
     {/* Footer */}
     <footer className="footer">
