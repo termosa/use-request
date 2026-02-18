@@ -68,11 +68,14 @@ const api = {
       () => data.fruits.filter((f) => f.toLowerCase().includes(query.toLowerCase())),
       200 + Math.random() * 1300
     ),
-  getPage: (page) => {
+  getPage: (letter, page) => {
     const pageSize = 5
+    const filtered = letter
+      ? data.fruits.filter((f) => f[0].toLowerCase() === letter)
+      : data.fruits
     const start = page * pageSize
     return simulateRequest(
-      () => data.fruits.slice(start, start + pageSize),
+      () => ({ items: filtered.slice(start, start + pageSize), total: filtered.length }),
       300 + Math.random() * 500
     )
   },

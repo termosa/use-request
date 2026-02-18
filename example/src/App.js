@@ -87,19 +87,23 @@ const raceCode = `<span class="kw">const</span> [query, setQuery] = <span class=
   [query]
 )`
 
-const infiniteLoadCode = `<span class="kw">const</span> [page, setPage] = <span class="fn">useState</span>(<span class="num">0</span>)
+const infiniteLoadCode = `<span class="kw">const</span> [filter, setFilter] = <span class="fn">useState</span>(<span class="str">''</span>)
+<span class="kw">const</span> [page, setPage] = <span class="fn">useState</span>(<span class="num">0</span>)
 
-<span class="kw">const</span> { value: items, pending } = <span class="fn">useRequest</span>(
+<span class="kw">const</span> { value, pending } = <span class="fn">useRequest</span>(
   api.<span class="prop">getPage</span>,
   {
-    <span class="prop">deps</span>: [page],
-    <span class="prop">reduce</span>: (all, page) <span class="op">=></span>
-      [...(all || []), ...page],
+    <span class="prop">deps</span>: [filter, page],
+    <span class="prop">reduceKeys</span>: [filter],
+    <span class="prop">reduce</span>: (acc, res) <span class="op">=></span> ({
+      items: [...(acc?.<span class="prop">items</span> || []), ...res.<span class="prop">items</span>],
+      total: res.<span class="prop">total</span>,
+    }),
   }
 )
 
-<span class="cm">// each response is folded into the previous</span>
-<span class="fn">setPage</span>(p <span class="op">=></span> p + <span class="num">1</span>)`
+<span class="cm">// filter change → fresh start</span>
+<span class="cm">// page change → accumulates</span>`
 
 const pkgManagers = [
   { id: 'npm', cmd: 'npm install use-request' },
@@ -253,6 +257,11 @@ const App = () => (
               <td><code>reduce</code></td>
               <td><code>(accumulated, response) =&gt; T</code></td>
               <td className="desc">Fold each response into accumulated value</td>
+            </tr>
+            <tr>
+              <td><code>reduceKeys</code></td>
+              <td><code>unknown[]</code></td>
+              <td className="desc">When any value changes, reduce starts fresh</td>
             </tr>
           </tbody>
         </table>

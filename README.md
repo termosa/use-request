@@ -38,7 +38,7 @@ import useRequest, { UseRequestStatus } from 'use-request'
 const Example = () => {
   const request = useRequest(
     callback, // Async function (can be sync if needed)
-    [] // Optional arguments list. The callback will be called immediately if this is set
+    [], // Optional arguments list. The callback will be called immediately if this is set
   )
 
   // Results
@@ -203,13 +203,10 @@ Fold each new response into the previous value — useful for infinite scroll, p
 ```tsx
 const useInfiniteItems = () => {
   const [page, setPage] = useState(0)
-  const { value: items, pending } = useRequest(
-    (p: number) => api.getItems(p),
-    {
-      deps: [page],
-      reduce: (all, pageItems) => [...(all || []), ...pageItems],
-    }
-  )
+  const { value: items, pending } = useRequest((p: number) => api.getItems(p), {
+    deps: [page],
+    reduce: (all, pageItems) => [...(all || []), ...pageItems],
+  })
 
   const pendingRef = useRef(pending)
   pendingRef.current = pending
@@ -230,6 +227,23 @@ const useInfiniteItems = () => {
 - `reset()` clears accumulated state — next reduce starts fresh
 - On error, accumulated value is preserved (won't lose pages 1-5 when page 6 fails)
 - Patches (`patchValue`) remain temporary — next reduce folds into the real (non-patched) state
+
+### Resetting accumulation with `reduceKeys`
+
+When certain deps change (like a filter), you want to start fresh instead of accumulating. Use `reduceKeys` to identify which values represent the "identity" of the data:
+
+```tsx
+const [filter, setFilter] = useState('all')
+const [page, setPage] = useState(0)
+
+const { value: items, pending } = useRequest((f, p) => api.getItems(f, p), {
+  deps: [filter, page],
+  reduceKeys: [filter],
+  reduce: (acc, pageItems) => [...(acc || []), ...pageItems],
+})
+```
+
+When any `reduceKeys` value changes, `reduce` receives `undefined` as `accumulated` — starting fresh. The old value stays visible on screen until the new response arrives (no flash of empty state).
 
 ## Optimistic Updates with `optimisticValue`
 
@@ -276,6 +290,7 @@ if (request.failed && request.patched) {
 ### When the callback throws
 
 If the `optimisticValue` callback itself throws, the error is caught and:
+
 - The current value is **kept unchanged**
 - The error is set on the request
 - Status becomes `pending` (the request still fires)
@@ -303,7 +318,7 @@ const SingleFunctionExample = () => {
 
   const { value, error, pending } = useRequest(
     generateNumber, // Async function that returns promise
-    [max ? +max : defaultMax] // Initial arguments
+    [max ? +max : defaultMax], // Initial arguments
   )
 
   return (
@@ -400,11 +415,12 @@ const useTodos = () => {
 
 #### Options object
 
-| Property          | Type                    | Description                                                |
-| ----------------- | ----------------------- | ---------------------------------------------------------- |
-| `deps`            | `T[] \| null`           | Dependencies array (triggers immediate execution when set) |
-| `optimisticValue` | `(value, ...args) => T` | Value to set immediately on execute                        |
-| `reduce`          | `(accumulated, response) => T` | Fold each response into accumulated value            |
+| Property          | Type                           | Description                                                |
+| ----------------- | ------------------------------ | ---------------------------------------------------------- |
+| `deps`            | `T[] \| null`                  | Dependencies array (triggers immediate execution when set) |
+| `optimisticValue` | `(value, ...args) => T`        | Value to set immediately on execute                        |
+| `reduce`          | `(accumulated, response) => T` | Fold each response into accumulated value                  |
+| `reduceKeys`      | `unknown[]`                    | When any value changes, reduce starts fresh                |
 
 ### Returned object
 

@@ -1412,3 +1412,144 @@ describe('reduce option', () => {
     expect(result.current.value).toEqual([1, 2, 3])
   })
 })
+
+// reduceKeys option tests
+describe('reduceKeys option', () => {
+  it('resets accumulation when reduceKeys change', async () => {
+    const { result, waitForNextUpdate, rerender } = renderHook(
+      ({ filter, page }) =>
+        useRequest((f: string, p: number) => Promise.resolve([`${f}-${p}`]), {
+          deps: [filter, page],
+          reduce: (acc, items) => [...(acc || []), ...items],
+          reduceKeys: [filter],
+        }),
+      { initialProps: { filter: 'a', page: 0 } }
+    )
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toEqual(['a-0'])
+
+    // Same filter, next page → accumulates
+    rerender({ filter: 'a', page: 1 })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toEqual(['a-0', 'a-1'])
+
+    // Filter changes → starts fresh
+    rerender({ filter: 'b', page: 0 })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toEqual(['b-0'])
+  })
+
+  it('keeps old value visible during pending after key change', async () => {
+    const { result, waitForNextUpdate, rerender } = renderHook(
+      ({ filter }) =>
+        useRequest((f: string) => heavyTask(oneTime, [`${f}-item`]), {
+          deps: [filter],
+          reduce: (acc, items) => [...(acc || []), ...items],
+          reduceKeys: [filter],
+        }),
+      { initialProps: { filter: 'a' } }
+    )
+
+    skip(oneTime)
+    await waitForNextUpdate()
+
+    expect(result.current.value).toEqual(['a-item'])
+
+    // Change filter — old value should stay visible during pending
+    rerender({ filter: 'b' })
+
+    expectStatus(UseRequestStatus.Pending, result.current)
+    expect(result.current.value).toEqual(['a-item'])
+
+    skip(oneTime)
+    await waitForNextUpdate()
+
+    // New value replaces (not accumulates)
+    expect(result.current.value).toEqual(['b-item'])
+  })
+
+  it('accumulates normally when reduceKeys are unchanged', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest((n: number) => Promise.resolve(n), {
+        reduce: (acc, val) => (acc ?? 0) + val,
+        reduceKeys: ['same'],
+      })
+    )
+
+    act(() => {
+      result.current.execute(5)
+    })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe(5)
+
+    act(() => {
+      result.current.execute(3)
+    })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe(8)
+  })
+
+  it('detects array length change as key change', async () => {
+    const { result, waitForNextUpdate, rerender } = renderHook(
+      ({ keys }) =>
+        useRequest(() => Promise.resolve(1), {
+          deps: [keys.join()],
+          reduce: (acc, val) => (acc ?? 0) + val,
+          reduceKeys: keys,
+        }),
+      { initialProps: { keys: ['a'] as string[] } }
+    )
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe(1)
+
+    // Same content different deps to trigger re-execute, but add a key
+    rerender({ keys: ['a', 'b'] })
+
+    await waitForNextUpdate()
+
+    // Key length changed → fresh start
+    expect(result.current.value).toBe(1)
+  })
+
+  it('works after reset', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useRequest((n: number) => Promise.resolve(n), {
+        reduce: (acc, val) => (acc ?? 0) + val,
+        reduceKeys: ['stable'],
+      })
+    )
+
+    act(() => {
+      result.current.execute(5)
+    })
+
+    await waitForNextUpdate()
+
+    expect(result.current.value).toBe(5)
+
+    act(() => {
+      result.current.reset()
+    })
+
+    act(() => {
+      result.current.execute(10)
+    })
+
+    await waitForNextUpdate()
+
+    // After reset, reduce starts fresh regardless of keys
+    expect(result.current.value).toBe(10)
+  })
+})

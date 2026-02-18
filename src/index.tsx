@@ -19,6 +19,16 @@ export interface UseRequestOptions<Value, Arguments extends unknown[]> {
   deps?: Arguments | null
   optimisticValue?: (value: Value | undefined, ...args: Arguments) => Value
   reduce?: (accumulated: Value | undefined, response: Value) => Value
+  reduceKeys?: unknown[]
+}
+
+function shallowEqual(a: unknown[] | undefined, b: unknown[] | undefined): boolean {
+  if (a === b) return true
+  if (!a || !b || a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
 }
 
 export function useRequest<Value, ErrorValue extends unknown = unknown, Arguments extends unknown[] = unknown[]>(
@@ -37,7 +47,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
   const opts: UseRequestOptions<Value, Arguments> =
     Array.isArray(options) || options === null ? { deps: options } : options || {}
 
-  const { deps, optimisticValue, reduce } = opts
+  const { deps, optimisticValue, reduce, reduceKeys } = opts
 
   const processesRef = React.useRef(0)
   const lastCompletedProcessRef = React.useRef(0)
@@ -51,6 +61,10 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
 
   const reduceRef = React.useRef(reduce)
   reduceRef.current = reduce
+
+  const reduceKeysRef = React.useRef(reduceKeys)
+  reduceKeysRef.current = reduceKeys
+  const lastReduceKeysRef = React.useRef(reduceKeys)
 
   // Real state from actual request (for resetPatch)
   const realStateRef = React.useRef<{ value?: Value; error?: ErrorValue }>({})
@@ -185,9 +199,12 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
             return
           }
           lastCompletedProcessRef.current = processIndex
+          const keysChanged = reduceKeysRef.current && !shallowEqual(lastReduceKeysRef.current, reduceKeysRef.current)
+          const accumulated = keysChanged ? undefined : realStateRef.current.value
           const finalValue = reduceRef.current
-            ? reduceRef.current(realStateRef.current.value, response)
+            ? reduceRef.current(accumulated, response)
             : response
+          lastReduceKeysRef.current = reduceKeysRef.current
           realStateRef.current = { value: finalValue }
           update({
             status: processIndex === processesRef.current ? UseRequestStatus.Completed : stateRef.current.status,

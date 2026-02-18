@@ -2,13 +2,24 @@ import React from 'react'
 import useRequest from 'use-request'
 import api from './api'
 
-const TOTAL = 27
+const filters = [
+  { label: 'All', value: '' },
+  { label: 'A', value: 'a' },
+  { label: 'B', value: 'b' },
+  { label: 'C', value: 'c' },
+  { label: 'P', value: 'p' },
+]
 
 const InfiniteLoadExample = () => {
+  const [letter, setLetter] = React.useState('')
   const [page, setPage] = React.useState(0)
-  const { value: items, pending, reset } = useRequest(api.getPage, {
-    deps: [page],
-    reduce: (all, pageItems) => [...(all || []), ...pageItems],
+  const { value, pending } = useRequest(api.getPage, {
+    deps: [letter, page],
+    reduceKeys: [letter],
+    reduce: (acc, res) => ({
+      items: [...(acc?.items || []), ...res.items],
+      total: res.total,
+    }),
   })
 
   const pendingRef = React.useRef(pending)
@@ -19,25 +30,42 @@ const InfiniteLoadExample = () => {
     setPage((p) => p + 1)
   }, [])
 
-  const handleReset = () => {
-    reset()
+  const changeFilter = (f) => {
+    setLetter(f)
     setPage(0)
   }
 
-  const hasMore = !items || items.length < TOTAL
+  const items = value?.items
+  const total = value?.total ?? 0
+  const hasMore = items && items.length < total
 
   return (
     <div>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+        {filters.map((f) => (
+          <button
+            key={f.value}
+            className={`demo-btn demo-btn-sm${letter === f.value ? '' : ' demo-btn-ghost'}`}
+            onClick={() => changeFilter(f.value)}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
       {items && (
         <div className="demo-result" style={{ marginBottom: 8 }}>
-          {items.map((item, i) => (
-            <span key={item}>
-              {i > 0 && ', '}
-              {item}
-            </span>
-          ))}
+          {items.length === 0 ? (
+            <span style={{ color: 'var(--text-dim)' }}>No items</span>
+          ) : (
+            items.map((item, i) => (
+              <span key={item}>
+                {i > 0 && ', '}
+                {item}
+              </span>
+            ))
+          )}
           <div style={{ marginTop: 6, color: 'var(--text-dim)', fontSize: 12 }}>
-            {items.length} of {TOTAL} loaded
+            {items.length} of {total} loaded
           </div>
         </div>
       )}
@@ -45,11 +73,6 @@ const InfiniteLoadExample = () => {
         {hasMore && (
           <button className="demo-btn" onClick={loadMore} disabled={pending}>
             {pending ? 'Loading...' : 'Load more'}
-          </button>
-        )}
-        {items && (
-          <button className="demo-btn demo-btn-ghost" onClick={handleReset}>
-            Reset
           </button>
         )}
         {pending && <span className="demo-spinner" />}
