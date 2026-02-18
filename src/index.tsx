@@ -159,6 +159,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
 
   const execute = React.useCallback((...args: Arguments) => {
     const processIndex = ++processesRef.current
+    const executeReduceKeys = reduceKeysRef.current
 
     // Apply optimisticValue if configured
     const optimisticValueValue = optimisticValueRef.current
@@ -199,12 +200,12 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
             return
           }
           lastCompletedProcessRef.current = processIndex
-          const keysChanged = reduceKeysRef.current && !shallowEqual(lastReduceKeysRef.current, reduceKeysRef.current)
+          const keysChanged = executeReduceKeys && !shallowEqual(lastReduceKeysRef.current, executeReduceKeys)
           const accumulated = keysChanged ? undefined : realStateRef.current.value
           const finalValue = reduceRef.current
             ? reduceRef.current(accumulated, response)
             : response
-          lastReduceKeysRef.current = reduceKeysRef.current
+          lastReduceKeysRef.current = executeReduceKeys
           realStateRef.current = { value: finalValue }
           update({
             status: processIndex === processesRef.current ? UseRequestStatus.Completed : stateRef.current.status,

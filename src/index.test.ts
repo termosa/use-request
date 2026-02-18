@@ -1523,6 +1523,51 @@ describe('reduceKeys option', () => {
     expect(result.current.value).toBe(1)
   })
 
+  it('compares keys captured at execute time, not at resolution time', async () => {
+    // Request A fires with filter="a", then filter changes to "b" firing request B.
+    // When A resolves, it should use its own keys (["a"]) not current (["b"]).
+    let callIndex = 0
+    const { result, waitForNextUpdate, rerender } = renderHook(
+      ({ filter, page }) =>
+        useRequest(
+          (f: string, p: number) => {
+            // Stagger delays: first in-flight resolves before second
+            const delay = ++callIndex === 2 ? oneTime : oneTime * 2
+            return heavyTask(delay, [`${f}-${p}`])
+          },
+          {
+            deps: [filter, page],
+            reduce: (acc, items) => [...(acc || []), ...items],
+            reduceKeys: [filter],
+          }
+        ),
+      { initialProps: { filter: 'a', page: 0 } }
+    )
+
+    // Let first request (call 1, delay=20) complete
+    skip(oneTime * 2)
+    await waitForNextUpdate()
+    expect(result.current.value).toEqual(['a-0'])
+
+    // Load page 1 with same filter (call 2, delay=10)
+    rerender({ filter: 'a', page: 1 })
+
+    // Before page 1 resolves, change filter → fires request with filter="b" (call 3, delay=20)
+    rerender({ filter: 'b', page: 0 })
+
+    // Page 1 (filter="a") resolves first — its captured keys are ["a"],
+    // matching lastReduceKeys ["a"], so it should ACCUMULATE
+    skip(oneTime)
+    await waitForNextUpdate()
+    expect(result.current.value).toEqual(['a-0', 'a-1'])
+
+    // Filter="b" request resolves — its captured keys are ["b"],
+    // differing from lastReduceKeys ["a"], so it should RESET
+    skip(oneTime)
+    await waitForNextUpdate()
+    expect(result.current.value).toEqual(['b-0'])
+  })
+
   it('works after reset', async () => {
     const { result, waitForNextUpdate } = renderHook(() =>
       useRequest((n: number) => Promise.resolve(n), {
