@@ -484,7 +484,7 @@ it('returns promise from the execute function that contains the error of callbac
   await expect(promise).rejects.toBe('error')
 })
 
-it('resets completed state', async () => {
+it('resets completed state and re-executes when deps present', async () => {
   const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 123, []))
 
   await waitForNextUpdate()
@@ -496,11 +496,32 @@ it('resets completed state', async () => {
     result.current.reset()
   })
 
+  // Re-executes immediately because deps is non-null
+  expectStatus(UseRequestStatus.Pending, result.current)
+  expect(result.current.value).toBeUndefined()
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Completed, result.current)
+  expect(result.current.value).toBe(123)
+})
+
+it('resets to idle when deps is null', () => {
+  const { result } = renderHook(() => useRequest(() => 123))
+
+  act(() => {
+    result.current.execute()
+  })
+
+  act(() => {
+    result.current.reset()
+  })
+
   expectStatus(UseRequestStatus.Idle, result.current)
   expect(result.current.value).toBeUndefined()
 })
 
-it('resets failed state', async () => {
+it('resets failed state and re-executes when deps present', async () => {
   const { result, waitForNextUpdate } = renderHook(() => useRequest(() => Promise.reject('error'), []))
 
   await waitForNextUpdate()
@@ -512,11 +533,17 @@ it('resets failed state', async () => {
     result.current.reset()
   })
 
-  expectStatus(UseRequestStatus.Idle, result.current)
+  // Re-executes immediately because deps is non-null
+  expectStatus(UseRequestStatus.Pending, result.current)
   expect(result.current.error).toBeUndefined()
+
+  await waitForNextUpdate()
+
+  expectStatus(UseRequestStatus.Failed, result.current)
+  expect(result.current.error).toBe('error')
 })
 
-it('cancel all requests in queue when state is reset', async () => {
+it('cancel all requests in queue when state is reset and re-executes with deps', async () => {
   const { result, rerender, waitForNextUpdate } = renderHook(
     ({ time, result }) => useRequest(heavyTask, [time, result]),
     {
@@ -547,17 +574,27 @@ it('cancel all requests in queue when state is reset', async () => {
     result.current.reset()
   })
 
-  expectStatus(UseRequestStatus.Idle, result.current)
+  // Re-executes with current deps [2*oneTime, 'third']
+  expectStatus(UseRequestStatus.Pending, result.current)
   expect(result.current.value).toBeUndefined()
 
-  // Pending requests resolve but should NOT update state (no waitForNextUpdate needed)
+  // Old pending requests resolve but should NOT update state
+  // New request from reset fires with [2*oneTime, 'third']
   await act(async () => {
-    jest.advanceTimersByTime(3 * oneTime)
+    jest.advanceTimersByTime(2 * oneTime)
     await Promise.resolve()
   })
 
-  expectStatus(UseRequestStatus.Idle, result.current)
-  expect(result.current.value).toBeUndefined()
+  // The re-triggered request completes with 'third'
+  expect(result.current.value).toBe('third')
+
+  // Remaining old request completes — should NOT override
+  await act(async () => {
+    jest.advanceTimersByTime(oneTime)
+    await Promise.resolve()
+  })
+
+  expect(result.current.value).toBe('third')
 })
 
 it('is not triggered when callback function is updated', async () => {
@@ -825,7 +862,7 @@ describe('resetPatch() method', () => {
 
 // reset() clears patches
 describe('reset() with patches', () => {
-  it('clears patches when reset is called', async () => {
+  it('clears patches when reset is called and re-executes with deps', async () => {
     const { result, waitForNextUpdate } = renderHook(() => useRequest(() => 123, []))
 
     await waitForNextUpdate()
@@ -842,7 +879,14 @@ describe('reset() with patches', () => {
 
     expect(result.current.value).toBeUndefined()
     expect(result.current.patched).toBe(false)
-    expectStatus(UseRequestStatus.Idle, result.current)
+    // Re-executes because deps is non-null
+    expectStatus(UseRequestStatus.Pending, result.current)
+
+    await waitForNextUpdate()
+
+    expectStatus(UseRequestStatus.Completed, result.current)
+    expect(result.current.value).toBe(123)
+    expect(result.current.patched).toBe(false)
   })
 })
 

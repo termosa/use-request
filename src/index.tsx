@@ -74,6 +74,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
     patched: false,
   })
   const [state, setState] = React.useState(stateRef.current)
+  const [resetCount, setResetCount] = React.useState(0)
   const update = (newState: InternalState<Value, ErrorValue>): void => {
     stateRef.current = newState
     setState(newState)
@@ -84,7 +85,10 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
     lastCompletedProcessRef.current = processesRef.current
     realStateRef.current = {}
     patchedAtProcessRef.current = 0
+    lastExecutedFunctionRef.current = undefined
+    lastExecutedDepsRef.current = undefined
     update({ status: UseRequestStatus.Idle, patched: false })
+    setResetCount(c => c + 1)
   }, [])
 
   const resetPatch = React.useCallback(() => {
@@ -248,7 +252,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
     lastExecutedDepsRef.current = deps
 
     if (deps) execute(...deps)
-  }, [execute, ...(deps || [])])
+  }, [execute, resetCount, ...(deps || [])])
 
   return React.useMemo(
     () => ({
