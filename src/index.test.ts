@@ -1678,7 +1678,7 @@ describe('reduceKeys option', () => {
 
   it('does not re-execute when reduceKeys change but deps are not set', async () => {
     let callCount = 0
-    const { result, rerender } = renderHook(
+    const { rerender } = renderHook(
       ({ filter }) =>
         useRequest(
           (n: number) => {
