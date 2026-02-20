@@ -1641,4 +1641,99 @@ describe('reduceKeys option', () => {
     // After reset, reduce starts fresh regardless of keys
     expect(result.current.value).toBe(10)
   })
+
+  it('re-executes when reduceKeys change and deps are set', async () => {
+    let callCount = 0
+    const { result, waitForNextUpdate, rerender } = renderHook(
+      ({ filter, query }) =>
+        useRequest(
+          (q: string) => {
+            callCount++
+            return Promise.resolve([`${q}-${callCount}`])
+          },
+          {
+            deps: [query] as [string],
+            reduce: (acc, items) => [...(acc || []), ...items],
+            reduceKeys: [filter],
+          }
+        ),
+      { initialProps: { filter: 'a', query: 'x' } }
+    )
+
+    await waitForNextUpdate()
+
+    expect(callCount).toBe(1)
+    expect(result.current.value).toEqual(['x-1'])
+
+    // Change only reduceKeys (filter), keep deps (query) the same
+    rerender({ filter: 'b', query: 'x' })
+
+    await waitForNextUpdate()
+
+    // Should have re-executed due to reduceKeys change
+    expect(callCount).toBe(2)
+    // Accumulation should reset because reduceKeys changed
+    expect(result.current.value).toEqual(['x-2'])
+  })
+
+  it('does not re-execute when reduceKeys change but deps are not set', async () => {
+    let callCount = 0
+    const { result, rerender } = renderHook(
+      ({ filter }) =>
+        useRequest(
+          (n: number) => {
+            callCount++
+            return Promise.resolve(n)
+          },
+          {
+            reduce: (acc, val) => (acc ?? 0) + val,
+            reduceKeys: [filter],
+          }
+        ),
+      { initialProps: { filter: 'a' } }
+    )
+
+    // No deps → no auto-execution
+    expect(callCount).toBe(0)
+
+    // Change reduceKeys
+    rerender({ filter: 'b' })
+
+    // Still no execution — deps not set
+    expect(callCount).toBe(0)
+  })
+
+  it('keeps old value visible during pending when only reduceKeys change', async () => {
+    const { result, waitForNextUpdate, rerender } = renderHook(
+      ({ filter, query }) =>
+        useRequest(
+          (q: string) => heavyTask(oneTime, [`${q}-item`]),
+          {
+            deps: [query] as [string],
+            reduce: (acc, items) => [...(acc || []), ...items],
+            reduceKeys: [filter],
+          }
+        ),
+      { initialProps: { filter: 'a', query: 'x' } }
+    )
+
+    skip(oneTime)
+    await waitForNextUpdate()
+
+    expect(result.current.value).toEqual(['x-item'])
+
+    // Change only reduceKeys, deps stay the same
+    rerender({ filter: 'b', query: 'x' })
+
+    // Old value should stay visible during pending
+    expectStatus(UseRequestStatus.Pending, result.current)
+    expect(result.current.value).toEqual(['x-item'])
+
+    skip(oneTime)
+    await waitForNextUpdate()
+
+    // Accumulation reset because reduceKeys changed
+    expect(result.current.value).toEqual(['x-item'])
+    expectStatus(UseRequestStatus.Completed, result.current)
+  })
 })

@@ -63,6 +63,10 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
   reduceRef.current = reduce
 
   const reduceKeysRef = React.useRef(reduceKeys)
+  const reduceKeysVersionRef = React.useRef(0)
+  if (!shallowEqual(reduceKeysRef.current, reduceKeys)) {
+    reduceKeysVersionRef.current++
+  }
   reduceKeysRef.current = reduceKeys
   const lastReduceKeysRef = React.useRef(reduceKeys)
 
@@ -87,6 +91,7 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
     patchedAtProcessRef.current = 0
     lastExecutedFunctionRef.current = undefined
     lastExecutedDepsRef.current = undefined
+    lastExecutedReduceKeysRef.current = undefined
     update({ status: UseRequestStatus.Idle, patched: false })
     setResetCount(c => c + 1)
   }, [])
@@ -245,14 +250,17 @@ export function useRequest<Value, ErrorValue extends unknown = unknown, Argument
 
   const lastExecutedFunctionRef = React.useRef<typeof execute>()
   const lastExecutedDepsRef = React.useRef<typeof deps>()
+  const lastExecutedReduceKeysRef = React.useRef<typeof reduceKeys>()
   React.useEffect(() => {
-    if (lastExecutedFunctionRef.current === execute && lastExecutedDepsRef.current === deps) return
+    const reduceKeysChanged = reduceKeys && !shallowEqual(lastExecutedReduceKeysRef.current, reduceKeys)
+    if (lastExecutedFunctionRef.current === execute && lastExecutedDepsRef.current === deps && !reduceKeysChanged) return
 
     lastExecutedFunctionRef.current = execute
     lastExecutedDepsRef.current = deps
+    lastExecutedReduceKeysRef.current = reduceKeys
 
     if (deps) execute(...deps)
-  }, [execute, resetCount, ...(deps || [])])
+  }, [execute, resetCount, reduceKeysVersionRef.current, ...(deps || [])])
 
   return React.useMemo(
     () => ({
